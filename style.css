@@ -1,0 +1,72 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 20px;
+    background-color: #f4f4f9;
+    color: #333;
+}
+header {
+    background-color: #4CAF50;
+    color: white;
+    padding: 15px;
+    text-align: center;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+main {
+    display: flex;
+    gap: 30px;
+}
+.data-entry, .report-area {
+    padding: 20px;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.data-entry {
+    flex: 1;
+    min-width: 300px;
+}
+.report-area {
+    flex: 2;
+}
+form input:not([type="checkbox"]), form button {
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    box-sizing: border-box;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+.checkbox-group {
+    margin: 10px 0;
+}
+h2 {
+    color: #4CAF50;
+    border-bottom: 2px solid #eee;
+    padding-bottom: 5px;
+    margin-top: 20px;
+}
+/* Report specific styles */
+.rider-group h3 {
+    margin-top: 15px;
+    color: #2c3e50;
+}
+.rider-group ol, .expense-list {
+    list-style: none;
+    padding-left: 0;
+}
+.rider-group li, .expense-list li {
+    padding: 3px 0;
+    border-bottom: 1px dotted #eee;
+}
+.summary-line {
+    font-weight: bold;
+    margin: 10px 0;
+    padding: 5px 0;
+    border-top: 1px solid #ccc;
+}
+.final-balance {
+    color: #e74c3c; /* Highlight the final figure */
+    font-size: 1.2em;
+    padding: 10px 0;
+}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Logistics Report System</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>Logistics Daily Reconciliation</h1>
+        <input type="date" id="reportDateInput">
+    </header>
+
+    <main>
+        <div class="data-entry">
+            <h2>📦 Add New Order</h2>
+            <form id="orderForm">
+                <input type="text" id="orderItem" placeholder="Item Description" required>
+                <input type="number" id="orderPrice" placeholder="Client Price (e.g., 41500)" required>
+                <input type="number" id="deliveryFee" placeholder="Delivery Fee (e.g., 5500)" required>
+                <input type="text" id="riderTag" placeholder="Rider Tag (e.g., Daniel)" required>
+                <input type="text" id="orderLocation" placeholder="Location (e.g., Osogbo)" required>
+                
+                <div class="checkbox-group">
+                    <label><input type="checkbox" id="isCash"> Paid in Cash?</label>
+                    <label><input type="checkbox" id="isDelivered" checked> Delivered?</label>
+                </div>
+                
+                <button type="submit">Add Order</button>
+            </form>
+
+            <h2>💸 Add New Expense</h2>
+            <form id="expenseForm">
+                <input type="text" id="expenseDescription" placeholder="Expense Details" required>
+                <input type="number" id="expenseAmount" placeholder="Amount (e.g., 20500)" required>
+                <button type="submit">Add Expense</button>
+            </form>
+
+            <h2>💰 Daily Settlement</h2>
+            <form id="settlementForm">
+                <input type="number" id="cashWithRiders" placeholder="Cash with Riders (e.g., 15000)">
+                <button type="submit">Update Settlement Data</button>
+            </form>
+        </div>
+
+        <div class="report-area">
+            <h2>📜 Daily Report</h2>
+            <button id="copyReportButton" style="display: none; margin-bottom: 10px;">📋 Copy Report Text</button>
+            <div id="reportContainer">
+                <p>Select a date or add data to generate the report.</p>
+            </div>
+        </div>
+    </main>
+
+    <script src="index.js"></script>
+</body>
+</html>
