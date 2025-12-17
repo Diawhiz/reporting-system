@@ -20,24 +20,82 @@ const saveReportData = (dateKey, data) => {
 
 // --- Copy Functionality ---
 
+// --- Copy Functionality (MODIFIED) ---
+
+// --- Copy Functionality (MODIFIED) ---
+
+// --- Copy Functionality (FINAL TEXT MERGING & CLEANUP) ---
+
 const copyReportToClipboard = () => {
     const reportContainer = document.getElementById('reportContainer');
     const reportDate = document.getElementById('reportDateInput').value;
     
-    // Create a temporary element to hold the report HTML for text extraction
     const tempElement = document.createElement('div');
     tempElement.innerHTML = reportContainer.innerHTML;
 
-    // Get the raw text and clean it up for pasting (removes excessive whitespace/newlines)
+    // 1. Get the raw, messy text
     let reportText = tempElement.innerText;
-    reportText = reportText.replace(/\n\s*\n/g, '\n\n').trim();
     
-    // Format header
-    const headerText = `\n--- DAILY REPORT FOR ${reportDate} ---\n\n`;
+    // 2. Initial Aggressive Cleaning: Remove all unnecessary non-alphanumeric separators, newlines, and multiple spaces.
+    // This is the most critical step to prevent items from running together or scattering.
+    reportText = reportText.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim();
+    
+    // --- Fix: Separate list items that ran together (e.g., '(6,000)2. ANti wrinkle') ---
+    // Look for a closing parenthesis followed immediately by a number and period, and insert a space.
+    reportText = reportText.replace(/(\))\s?(\d+\.)/g, '$1 $2');
+    
+    // --- Fix: Clean up extra dashes and garbage left from list rendering ---
+    reportText = reportText.replace(/-\s+-\s+/g, ''); 
+    reportText = reportText.replace(/-\s+/g, ''); // Remove stray hyphens
+
+    // 3. Structured Formatting and Reintroducing ESSENTIAL Line Breaks (\n)
+
+    // a) Main Header
+    const headerText = `\n--- DAILY REPORT FOR ${reportDate} ---\n`;
+    reportText = headerText + reportText;
+
+    // b) Section Headers: Add clear breaks around sections (e.g., ===)
+    reportText = reportText.replace(/(\s*📦 Delivered Orders Summary)/g, '\n\n=== DELIVERED ORDERS ===\n');
+    reportText = reportText.replace(/(\s*💸 Expenses)/g, '\n\n=== EXPENSES ===\n');
+    reportText = reportText.replace(/(\s*💰 Reconciliation Summary)/g, '\n\n=== RECONCILIATION ===\n');
+
+    // c) Order Details and Subtotals: 
+    
+    // 1. Rider Group Header: Ensure it starts on a new line and remove any leading spaces.
+    // [A-Za-z] matches the start of the rider tag (e.g., 'ife', 'osogbo')
+    reportText = reportText.replace(/(\s)([A-Za-z]+ \([^)]+\))/g, '\n$2');
+
+    // 2. List Items: Ensure each item starts on a new line with a consistent dash.
+    reportText = reportText.replace(/(\d{1,3}\. )/g, '\n- $1'); 
+    
+    // 3. Subtotals: Put them on their own line and clearly mark them without excessive indentation.
+    reportText = reportText.replace(/(Total for [^:]+: \d{1,3}(,\d{3})*)/g, '\n   -- Subtotal: $1\n');
+
+    // 4. Total Sales: Must be on its own line
+    reportText = reportText.replace(/(TOTAL SALES [^\s]+)/g, '\n\n--- $1');
+    
+    // d) Expenses: Ensure each expense item starts on a new line.
+    reportText = reportText.replace(/(\d{1,3}\. [^-\s]+)/g, '\n- $1');
+    
+    // TOTAL EXPENSES: Put it on its own line.
+    reportText = reportText.replace(/(TOTAL EXPENSES: \d{1,3}(,\d{3})*)/g, '\n--- $1\n');
+
+
+    // e) Reconciliation: Ensure each calculation step is clearly on a new line.
+    reportText = reportText.replace(/Client Funds Collected/g, '\nClient Funds Collected');
+    reportText = reportText.replace(/ - Total Expenses Paid/g, '\n- Total Expenses Paid');
+    reportText = reportText.replace(/= Balance: \d{1,3}(,\d{3})*\s+Cash with Riders/g, '\n= Balance: $&\n- Cash with Riders');
+    reportText = reportText.replace(/= FINAL TRANSFER AMOUNT: \d{1,3}(,\d{3})*/g, '\n\n= FINAL TRANSFER AMOUNT: $&');
+    
+    // Final cleanup of redundant header parts
+    reportText = reportText.replace(/📅 Report for: \d{4}-\d{2}-\d{2}/, '');
+    
+    const finalReport = reportText.trim();
+
 
     // Use the modern Clipboard API
-    navigator.clipboard.writeText(headerText + reportText).then(() => {
-        // Provide visual feedback
+    navigator.clipboard.writeText(finalReport).then(() => {
+        // ... (visual feedback code remains the same) ...
         const button = document.getElementById('copyReportButton');
         const originalText = button.textContent;
         button.textContent = '✅ Copied!';
@@ -50,7 +108,6 @@ const copyReportToClipboard = () => {
         alert('❌ Error copying report. Please check the browser console.');
     });
 };
-
 
 // --- Initialization and Event Listeners ---
 
