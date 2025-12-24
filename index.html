@@ -3,56 +3,51 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Logistics Report System</title>
+    <title>Daily Report - Mobile Responsive</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <header>
-        <h1>Logistics Daily Reconciliation</h1>
-        <input type="date" id="reportDateInput">
-    </header>
 
-    <main>
-        <div class="data-entry">
-            <h2>📦 Add New Order</h2>
-            <form id="orderForm">
-                <input type="text" id="orderItem" placeholder="Item Description" required>
-                <input type="number" id="orderPrice" placeholder="Client Price (e.g., 41500)" required>
-                <input type="number" id="deliveryFee" placeholder="Delivery Fee (e.g., 5500)" required>
-                <input type="text" id="riderTag" placeholder="Rider Tag (e.g., Daniel)" required>
-                <input type="text" id="orderLocation" placeholder="Location (e.g., Osogbo)" required>
-                
-                <div class="checkbox-group">
-                    <label><input type="checkbox" id="isCash"> Paid in Cash?</label>
-                    <label><input type="checkbox" id="isDelivered" checked> Delivered?</label>
-                </div>
-                
-                <button type="submit">Add Order</button>
-            </form>
+<div class="container">
+    <h1>Daily Report Generator</h1>
+    
+    <div class="date-section">
+        <label>Report Date:</label>
+        <input type="date" id="report-date">
+    </div>
 
-            <h2>💸 Add New Expense</h2>
-            <form id="expenseForm">
-                <input type="text" id="expenseDescription" placeholder="Expense Details" required>
-                <input type="number" id="expenseAmount" placeholder="Amount (e.g., 20500)" required>
-                <button type="submit">Add Expense</button>
-            </form>
-
-            <h2>💰 Daily Settlement</h2>
-            <form id="settlementForm">
-                <input type="number" id="cashWithRiders" placeholder="Cash with Riders (e.g., 15000)">
-                <button type="submit">Update Settlement Data</button>
-            </form>
+    <div class="card">
+        <h2>Add Delivery</h2>
+        <div class="form-grid">
+            <input type="hidden" id="edit-delivery-index" value="">
+            <input type="text" id="delivery-location" placeholder="Location (e.g. Ikirun)">
+            <input type="text" id="rider-name" placeholder="Rider/Name (e.g. Israel)">
+            <input type="text" id="product-name" placeholder="Product">
+            <input type="number" id="product-price" placeholder="Price">
+            <input type="number" id="delivery-fee" placeholder="Delivery Fee">
         </div>
+        <button class="btn-primary" id="delivery-btn" onclick="addOrUpdateDelivery()">Add Delivery</button>
+    </div>
 
-        <div class="report-area">
-            <h2>📜 Daily Report</h2>
-            <button id="copyReportButton" style="display: none; margin-bottom: 10px;">📋 Copy Report Text</button>
-            <div id="reportContainer">
-                <p>Select a date or add data to generate the report.</p>
-            </div>
+    <div class="card">
+        <h2>Add Expense</h2>
+        <div class="form-grid">
+            <input type="hidden" id="edit-expense-index" value="">
+            <input type="text" id="expense-desc" placeholder="Expense Description">
+            <input type="number" id="expense-amt" placeholder="Amount">
         </div>
-    </main>
+        <button class="btn-secondary" id="expense-btn" onclick="addOrUpdateExpense()">Add Expense</button>
+    </div>
 
-    <script src="index.js"></script>
+    <div id="report-preview">
+        <div id="delivery-list"></div>
+        <div id="expense-list"></div>
+        <div id="reconciliation-summary"></div>
+    </div>
+
+    <button class="btn-copy" onclick="copyFullReport()">Copy Full Report (Plain Text)</button>
+</div>
+
+<script src="app.js"></script>
 </body>
 </html>
