@@ -1,8 +1,41 @@
 let deliveries = [];
 let expenses = [];
 
-document.getElementById('report-date').valueAsDate = new Date();
+// --- INITIALIZATION ---
+window.onload = () => {
+    checkAndResetDaily();
+    loadFromStorage();
+    document.getElementById('report-date').valueAsDate = new Date();
+    renderAll();
+};
 
+// Check if the stored date matches today. If not, wipe the data.
+function checkAndResetDaily() {
+    const today = new Date().toDateString();
+    const lastSavedDate = localStorage.getItem('lastSavedDate');
+
+    if (lastSavedDate && lastSavedDate !== today) {
+        localStorage.removeItem('deliveries');
+        localStorage.removeItem('expenses');
+        Optional: alert("New day detected! Clearing previous data.");
+    }
+	localStorage.setItem('lastSavedDate', today);
+}
+
+function saveToStorage() {
+    localStorage.setItem('deliveries', JSON.stringify(deliveries));
+    localStorage.setItem('expenses', JSON.stringify(expenses));
+}
+
+function loadFromStorage() {
+    const storedDeliveries = localStorage.getItem('deliveries');
+    const storedExpenses = localStorage.getItem('expenses');
+    
+    if (storedDeliveries) deliveries = JSON.parse(storedDeliveries);
+    if (storedExpenses) expenses = JSON.parse(storedExpenses);
+}
+
+// --- CORE FUNCTIONS ---
 function addOrUpdateDelivery() {
     const location = document.getElementById('delivery-location').value.trim();
     const rider = document.getElementById('rider-name').value.trim();
@@ -24,14 +57,47 @@ function addOrUpdateDelivery() {
     }
 
     clearInputs(['delivery-location', 'product-name', 'product-price', 'delivery-fee']);
+    saveToStorage(); // Save after change
     renderAll();
 }
 
+function addOrUpdateExpense() {
+    const desc = document.getElementById('expense-desc').value.trim();
+    const amt = parseFloat(document.getElementById('expense-amt').value) || 0;
+    const editIndex = document.getElementById('edit-expense-index').value;
+    
+    if (!desc || amt <= 0) return alert("Enter expense details");
+    
+    if (editIndex !== "") {
+        expenses[editIndex] = { desc, amt };
+        document.getElementById('edit-expense-index').value = "";
+        document.getElementById('expense-btn').innerText = "Add Expense";
+    } else { 
+        expenses.push({ desc, amt }); 
+    }
+    
+    clearInputs(['expense-desc', 'expense-amt']);
+    saveToStorage(); // Save after change
+    renderAll();
+}
+
+function deleteDelivery(i) { 
+    deliveries.splice(i, 1); 
+    saveToStorage(); 
+    renderAll(); 
+}
+
+function deleteExpense(i) { 
+    expenses.splice(i, 1); 
+    saveToStorage(); 
+    renderAll(); 
+}
+
+// --- RENDER LOGIC ---
 function renderDeliveries() {
     const container = document.getElementById('delivery-list');
     container.innerHTML = "<h3>=== DELIVERED ORDERS ===</h3>";
 
-    // NEW LOGIC: Group strictly by Rider Name
     const groupedByRider = {};
     deliveries.forEach((d, i) => {
         if (!groupedByRider[d.rider]) groupedByRider[d.rider] = [];
@@ -59,7 +125,45 @@ function renderDeliveries() {
     }
 }
 
-// --- PLAIN TEXT COPY (RESTRUCTURED) ---
+function renderExpenses() {
+    const container = document.getElementById('expense-list');
+    container.innerHTML = "<h3>=== EXPENSES ===</h3>";
+    expenses.forEach((e, i) => {
+        container.innerHTML += `<div class="item-row"><span>${e.desc}: ${e.amt.toLocaleString()}</span><div class="action-btns"><button style="background:orange" onclick="editExpense(${i})">Edit</button><button style="background:red; color:white;" onclick="deleteExpense(${i})">Del</button></div></div>`;
+    });
+}
+
+function renderSummary() {
+    const totalSales = deliveries.reduce((sum, d) => sum + d.price, 0);
+    const totalExp = expenses.reduce((sum, e) => sum + e.amt, 0);
+    document.getElementById('reconciliation-summary').innerHTML = `<div class="summary-box"><h3>=== RECONCILIATION ===</h3><p>Sales: ${totalSales.toLocaleString()}</p><p>Expenses: ${totalExp.toLocaleString()}</p><h4 style="margin:10px 0 0 0; color:var(--accent)">Final Transfer: ${(totalSales - totalExp).toLocaleString()}</h4></div>`;
+}
+
+function renderAll() { renderDeliveries(); renderExpenses(); renderSummary(); }
+
+// --- UI HELPERS ---
+function editDelivery(index) {
+    const d = deliveries[index];
+    document.getElementById('delivery-location').value = d.location;
+    document.getElementById('rider-name').value = d.rider;
+    document.getElementById('product-name').value = d.product;
+    document.getElementById('product-price').value = d.price;
+    document.getElementById('delivery-fee').value = d.fee;
+    document.getElementById('edit-delivery-index').value = index;
+    document.getElementById('delivery-btn').innerText = "Update Detail";
+    window.scrollTo(0,0);
+}
+
+function editExpense(index) {
+    const e = expenses[index];
+    document.getElementById('expense-desc').value = e.desc;
+    document.getElementById('expense-amt').value = e.amt;
+    document.getElementById('edit-expense-index').value = index;
+    document.getElementById('expense-btn').innerText = "Update Expense";
+}
+
+function clearInputs(ids) { ids.forEach(id => document.getElementById(id).value = ""); }
+
 function copyFullReport() {
     const date = document.getElementById('report-date').value;
     let text = `DAILY REPORT FOR ${date}\n\n=== DELIVERED ORDERS ===\n`;
@@ -98,54 +202,5 @@ function copyFullReport() {
     text += `Client Funds Collected (${totalSales.toLocaleString()}) - Total Expenses Paid (${totalExp.toLocaleString()}) = Balance: ${(totalSales - totalExp).toLocaleString()}\n\n`;
     text += `= FINAL TRANSFER AMOUNT: ${(totalSales - totalExp).toLocaleString()}`;
 
-    navigator.clipboard.writeText(text).then(() => alert("Report Copied in Rider-Priority Format!"));
+    navigator.clipboard.writeText(text).then(() => alert("Report Copied!"));
 }
-
-// Use the previous Edit/Delete/Summary functions provided in the last response...
-function editDelivery(index) {
-    const d = deliveries[index];
-    document.getElementById('delivery-location').value = d.location;
-    document.getElementById('rider-name').value = d.rider;
-    document.getElementById('product-name').value = d.product;
-    document.getElementById('product-price').value = d.price;
-    document.getElementById('delivery-fee').value = d.fee;
-    document.getElementById('edit-delivery-index').value = index;
-    document.getElementById('delivery-btn').innerText = "Update Detail";
-    window.scrollTo(0,0);
-}
-function addOrUpdateExpense() {
-    const desc = document.getElementById('expense-desc').value.trim();
-    const amt = parseFloat(document.getElementById('expense-amt').value) || 0;
-    const editIndex = document.getElementById('edit-expense-index').value;
-    if (!desc || amt <= 0) return alert("Enter expense details");
-    if (editIndex !== "") {
-        expenses[editIndex] = { desc, amt };
-        document.getElementById('edit-expense-index').value = "";
-        document.getElementById('expense-btn').innerText = "Add Expense";
-    } else { expenses.push({ desc, amt }); }
-    clearInputs(['expense-desc', 'expense-amt']);
-    renderAll();
-}
-function renderExpenses() {
-    const container = document.getElementById('expense-list');
-    container.innerHTML = "<h3>=== EXPENSES ===</h3>";
-    expenses.forEach((e, i) => {
-        container.innerHTML += `<div class="item-row"><span>${e.desc}: ${e.amt.toLocaleString()}</span><div class="action-btns"><button style="background:orange" onclick="editExpense(${i})">Edit</button><button style="background:red; color:white;" onclick="deleteExpense(${i})">Del</button></div></div>`;
-    });
-}
-function editExpense(index) {
-    const e = expenses[index];
-    document.getElementById('expense-desc').value = e.desc;
-    document.getElementById('expense-amt').value = e.amt;
-    document.getElementById('edit-expense-index').value = index;
-    document.getElementById('expense-btn').innerText = "Update Expense";
-}
-function renderAll() { renderDeliveries(); renderExpenses(); renderSummary(); }
-function renderSummary() {
-    const totalSales = deliveries.reduce((sum, d) => sum + d.price, 0);
-    const totalExp = expenses.reduce((sum, e) => sum + e.amt, 0);
-    document.getElementById('reconciliation-summary').innerHTML = `<div class="summary-box"><h3>=== RECONCILIATION ===</h3><p>Sales: ${totalSales.toLocaleString()}</p><p>Expenses: ${totalExp.toLocaleString()}</p><h4 style="margin:10px 0 0 0; color:var(--accent)">Final Transfer: ${(totalSales - totalExp).toLocaleString()}</h4></div>`;
-}
-function deleteDelivery(i) { deliveries.splice(i, 1); renderAll(); }
-function deleteExpense(i) { expenses.splice(i, 1); renderAll(); }
-function clearInputs(ids) { ids.forEach(id => document.getElementById(id).value = ""); }
