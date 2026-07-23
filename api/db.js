@@ -5,12 +5,12 @@ const { Pool } = require('pg');
 let db = null;
 let isPostgres = true;
 
-const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
-
+let connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 
 if (connectionString) {
+  const cleanConnectionString = connectionString.replace(/(\?|&)sslmode=[^&]+/g, '');
   db = new Pool({
-    connectionString: connectionString,
+    connectionString: cleanConnectionString,
     ssl: {
       rejectUnauthorized: false
     }
