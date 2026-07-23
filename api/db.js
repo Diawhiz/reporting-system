@@ -5,43 +5,52 @@ const { Pool } = require('pg');
 let db = null;
 let isPostgres = true;
 
-let connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+// Lazy-load database connection
+function getDb() {
+  if (db) return db;
 
-if (connectionString) {
-  const cleanConnectionString = connectionString.replace(/(\?|&)sslmode=[^&]+/g, '');
-  db = new Pool({
-    connectionString: cleanConnectionString,
-    ssl: {
-      rejectUnauthorized: false
+  const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
+
+  if (connectionString) {
+    const cleanConnectionString = connectionString.replace(/(\?|&)sslmode=[^&]+/g, '');
+    db = new Pool({
+      connectionString: cleanConnectionString,
+      ssl: {
+        rejectUnauthorized: false
+      }
+    });
+    isPostgres = true;
+  } else {
+    // If on Vercel, do not attempt to fall back to SQLite, fail clearly
+    if (process.env.VERCEL || process.env.NOW_REGION) {
+      throw new Error("DATABASE_URL environment variable is missing on Vercel. Please add it to your environment variables in Vercel settings.");
     }
-  });
-} else {
-  // If on Vercel, do not attempt to fall back to SQLite, fail clearly
-  if (process.env.VERCEL || process.env.NOW_REGION) {
-    throw new Error("DATABASE_URL environment variable is missing on Vercel. Please add it to your environment variables in Vercel settings.");
-  }
 
-  // Local fallback to SQLite
-  isPostgres = false;
-  try {
-    const sqlite3 = require('sqlite3').verbose();
-    const path = require('path');
-    const dbPath = path.resolve(process.cwd(), 'reporting.db');
-    db = new sqlite3.Database(dbPath);
-  } catch (err) {
-    console.error('Failed to load SQLite:', err);
+    // Local fallback to SQLite
+    isPostgres = false;
+    try {
+      const sqlite3 = require('sqlite3').verbose();
+      const path = require('path');
+      const dbPath = path.resolve(process.cwd(), 'reporting.db');
+      db = new sqlite3.Database(dbPath);
+    } catch (err) {
+      console.error('Failed to load SQLite:', err);
+      throw err;
+    }
   }
+  return db;
 }
 
 // Helper to run query and return rows
 async function query(text, params) {
+  const database = getDb();
   if (isPostgres) {
-    const res = await db.query(text, params);
+    const res = await database.query(text, params);
     return res.rows;
   } else {
     return new Promise((resolve, reject) => {
       const sqliteText = text.replace(/\$\d+/g, () => '?');
-      db.all(sqliteText, params, (err, rows) => {
+      database.all(sqliteText, params, (err, rows) => {
         if (err) reject(err);
         else resolve(rows);
       });
@@ -51,13 +60,14 @@ async function query(text, params) {
 
 // Helper for INSERT / UPDATE / DELETE that returns info
 async function execute(text, params) {
+  const database = getDb();
   if (isPostgres) {
-    const res = await db.query(text, params);
+    const res = await database.query(text, params);
     return res;
   } else {
     return new Promise((resolve, reject) => {
       const sqliteText = text.replace(/\$\d+/g, () => '?');
-      db.run(sqliteText, params, function(err) {
+      database.run(sqliteText, params, function(err) {
         if (err) reject(err);
         else resolve({ lastID: this.lastID, changes: this.changes });
       });
@@ -81,9 +91,10 @@ async function getUserId(req) {
 
 // Initialize tables and apply migrations
 async function initDb() {
+  const database = getDb();
   if (isPostgres) {
     // 1. Create Core Users Table
-    await db.query(`
+    await database.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         username VARCHAR(255) UNIQUE NOT NULL,
@@ -93,7 +104,7 @@ async function initDb() {
     `);
 
     // 2. Create Sessions Table
-    await db.query(`
+    await database.query(`
       CREATE TABLE IF NOT EXISTS sessions (
         token VARCHAR(255) PRIMARY KEY,
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -102,7 +113,7 @@ async function initDb() {
     `);
 
     // 3. Create Deliveries & Expenses
-    await db.query(`
+    await database.query(`
       CREATE TABLE IF NOT EXISTS deliveries (
         id SERIAL PRIMARY KEY,
         date VARCHAR(20) NOT NULL,
@@ -114,7 +125,7 @@ async function initDb() {
         user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
       );
     `);
-    await db.query(`
+    await database.query(`
       CREATE TABLE IF NOT EXISTS expenses (
         id SERIAL PRIMARY KEY,
         date VARCHAR(20) NOT NULL,
@@ -126,15 +137,15 @@ async function initDb() {
 
     // 4. Alter existing columns if they don't have user_id (for backwards compatibility migration)
     try {
-      await db.query(`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;`);
-      await db.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;`);
+      await database.query(`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;`);
+      await database.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;`);
     } catch (e) {
       // Ignored if they already exist or ALTER not supported (older versions)
     }
-  } else if (db) {
+  } else if (database) {
     return new Promise((resolve, reject) => {
-      db.serialize(() => {
-        db.run(`
+      database.serialize(() => {
+        database.run(`
           CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -143,7 +154,7 @@ async function initDb() {
           );
         `);
 
-        db.run(`
+        database.run(`
           CREATE TABLE IF NOT EXISTS sessions (
             token TEXT PRIMARY KEY,
             user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
@@ -151,7 +162,7 @@ async function initDb() {
           );
         `);
 
-        db.run(`
+        database.run(`
           CREATE TABLE IF NOT EXISTS deliveries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
@@ -164,7 +175,7 @@ async function initDb() {
           );
         `);
 
-        db.run(`
+        database.run(`
           CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
@@ -175,8 +186,8 @@ async function initDb() {
         `);
 
         // Migration for SQLite: Add user_id if missing
-        db.run(`ALTER TABLE deliveries ADD COLUMN user_id INTEGER;`, () => {});
-        db.run(`ALTER TABLE expenses ADD COLUMN user_id INTEGER;`, () => {
+        database.run(`ALTER TABLE deliveries ADD COLUMN user_id INTEGER;`, () => {});
+        database.run(`ALTER TABLE expenses ADD COLUMN user_id INTEGER;`, () => {
           resolve();
         });
       });
@@ -188,6 +199,5 @@ module.exports = {
   query,
   execute,
   initDb,
-  getUserId,
-  isPostgres
+  getUserId
 };
