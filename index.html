@@ -3,49 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Daily Report - Mobile Responsive</title>
+    <title>Sage Logistics - Daily Report Generator</title>
+    <!-- Import Outfit & Inter Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div class="container">
-    <h1>Daily Report Generator</h1>
-    
-    <div class="date-section">
-        <label>Report Date:</label>
-        <input type="date" id="report-date">
-    </div>
-
-    <div class="card">
-        <h2>Add Delivery</h2>
-        <div class="form-grid">
-            <input type="hidden" id="edit-delivery-index" value="">
-            <input type="text" id="delivery-location" placeholder="Location (e.g. Ikirun)">
-            <input type="text" id="rider-name" placeholder="Rider/Name (e.g. Israel)">
-            <input type="text" id="product-name" placeholder="Product">
-            <input type="number" id="product-price" placeholder="Price">
-            <input type="number" id="delivery-fee" placeholder="Delivery Fee">
+<div class="app-layout">
+    <header class="app-header">
+        <div class="brand">
+            <span class="logo-icon">🚚</span>
+            <div>
+                <h1>Sage Logistics</h1>
+                <p class="subtitle">Daily Reconciliation Dashboard</p>
+            </div>
         </div>
-        <button class="btn-primary" id="delivery-btn" onclick="addOrUpdateDelivery()">Add Delivery</button>
-    </div>
-
-    <div class="card">
-        <h2>Add Expense</h2>
-        <div class="form-grid">
-            <input type="hidden" id="edit-expense-index" value="">
-            <input type="text" id="expense-desc" placeholder="Expense Description">
-            <input type="number" id="expense-amt" placeholder="Amount">
+        
+        <!-- Date Navigation Controls -->
+        <div class="date-navigator">
+            <button class="btn-nav" id="prev-day-btn" onclick="navigateDay(-1)" title="Previous Day">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+            </button>
+            <div class="date-input-wrapper">
+                <input type="date" id="report-date">
+            </div>
+            <button class="btn-nav" id="next-day-btn" onclick="navigateDay(1)" title="Next Day">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+            </button>
         </div>
-        <button class="btn-secondary" id="expense-btn" onclick="addOrUpdateExpense()">Add Expense</button>
-    </div>
+    </header>
 
-    <div id="report-preview">
-        <div id="delivery-list"></div>
-        <div id="expense-list"></div>
-        <div id="reconciliation-summary"></div>
-    </div>
+    <main class="dashboard-grid">
+        <!-- Input Columns (Left/Top) -->
+        <section class="forms-column">
+            <!-- Add/Edit Delivery Card -->
+            <div class="card glass">
+                <div class="card-header">
+                    <h2>Add Delivery</h2>
+                    <span class="badge badge-accent">Orders</span>
+                </div>
+                <div class="form-grid">
+                    <input type="hidden" id="edit-delivery-index" value="">
+                    
+                    <div class="input-group">
+                        <label for="delivery-location">Location</label>
+                        <input type="text" id="delivery-location" placeholder="e.g. Ikirun">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="rider-name">Rider</label>
+                        <input type="text" id="rider-name" placeholder="e.g. Israel">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="product-name">Product</label>
+                        <input type="text" id="product-name" placeholder="Product name">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="product-price">Price (₦)</label>
+                        <input type="number" id="product-price" placeholder="0">
+                    </div>
+                    
+                    <div class="input-group full-width">
+                        <label for="delivery-fee">Delivery Fee (₦)</label>
+                        <input type="number" id="delivery-fee" placeholder="0">
+                    </div>
+                </div>
+                <button class="btn btn-primary" id="delivery-btn" onclick="addOrUpdateDelivery()">Add Delivery</button>
+            </div>
 
-    <button class="btn-copy" onclick="copyFullReport()">Copy Full Report (Plain Text)</button>
+            <!-- Add/Edit Expense Card -->
+            <div class="card glass">
+                <div class="card-header">
+                    <h2>Add Expense</h2>
+                    <span class="badge badge-danger">Cost</span>
+                </div>
+                <div class="form-grid">
+                    <input type="hidden" id="edit-expense-index" value="">
+                    
+                    <div class="input-group">
+                        <label for="expense-desc">Description</label>
+                        <input type="text" id="expense-desc" placeholder="Expense description">
+                    </div>
+                    
+                    <div class="input-group">
+                        <label for="expense-amt">Amount (₦)</label>
+                        <input type="number" id="expense-amt" placeholder="0">
+                    </div>
+                </div>
+                <button class="btn btn-secondary" id="expense-btn" onclick="addOrUpdateExpense()">Add Expense</button>
+            </div>
+        </section>
+
+        <!-- Preview & Report Lists (Right/Bottom) -->
+        <section class="preview-column">
+            <!-- Delivered Orders View -->
+            <div class="card data-card">
+                <div id="delivery-list"></div>
+            </div>
+
+            <!-- Expenses View -->
+            <div class="card data-card">
+                <div id="expense-list"></div>
+            </div>
+
+            <!-- Summary & Actions -->
+            <div class="card summary-card glass">
+                <div id="reconciliation-summary"></div>
+                <button class="btn btn-copy" onclick="copyFullReport()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                    Copy Full Report
+                </button>
+            </div>
+        </section>
+    </main>
 </div>
 
 <script src="app.js"></script>

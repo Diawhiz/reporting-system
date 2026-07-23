@@ -1,0 +1,26 @@
+{
+  "name": "reporting-system",
+  "version": "1.0.0",
+  "description": "I didn't do anything i just vibe coded it. I am lazy to be typing any report.",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Diawhiz/reporting-system.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/Diawhiz/reporting-system/issues"
+  },
+  "homepage": "https://github.com/Diawhiz/reporting-system#readme",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "pg": "^8.12.0",
+    "sqlite3": "^5.1.7"
+  }
+}
