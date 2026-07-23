@@ -1,4 +1,3 @@
-// Load environment variables from .env file locally
 require('dotenv').config();
 
 const { Pool } = require('pg');
@@ -8,6 +7,7 @@ let isPostgres = true;
 
 const connectionString = process.env.POSTGRES_URL || process.env.DATABASE_URL;
 
+
 if (connectionString) {
   db = new Pool({
     connectionString: connectionString,
@@ -16,7 +16,7 @@ if (connectionString) {
     }
   });
 } else {
-  // Local fallback to SQLite if connection string is missing
+  // Local fallback to SQLite
   isPostgres = false;
   try {
     const sqlite3 = require('sqlite3').verbose();
@@ -60,9 +60,43 @@ async function execute(text, params) {
   }
 }
 
-// Initialize tables
+// Session authentication helper
+async function getUserId(req) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  const token = authHeader.split(' ')[1];
+  const rows = await query('SELECT user_id FROM sessions WHERE token = $1', [token]);
+  if (rows.length > 0) {
+    return rows[0].user_id;
+  }
+  return null;
+}
+
+// Initialize tables and apply migrations
 async function initDb() {
   if (isPostgres) {
+    // 1. Create Core Users Table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS users (
+        id SERIAL PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        salt VARCHAR(255) NOT NULL
+      );
+    `);
+
+    // 2. Create Sessions Table
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS sessions (
+        token VARCHAR(255) PRIMARY KEY,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
+
+    // 3. Create Deliveries & Expenses
     await db.query(`
       CREATE TABLE IF NOT EXISTS deliveries (
         id SERIAL PRIMARY KEY,
@@ -71,7 +105,8 @@ async function initDb() {
         rider VARCHAR(255) NOT NULL,
         product VARCHAR(255) NOT NULL,
         price NUMERIC(12, 2) NOT NULL,
-        fee NUMERIC(12, 2) NOT NULL
+        fee NUMERIC(12, 2) NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
       );
     `);
     await db.query(`
@@ -79,12 +114,38 @@ async function initDb() {
         id SERIAL PRIMARY KEY,
         date VARCHAR(20) NOT NULL,
         description VARCHAR(255) NOT NULL,
-        amount NUMERIC(12, 2) NOT NULL
+        amount NUMERIC(12, 2) NOT NULL,
+        user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
       );
     `);
+
+    // 4. Alter existing columns if they don't have user_id (for backwards compatibility migration)
+    try {
+      await db.query(`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;`);
+      await db.query(`ALTER TABLE expenses ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES users(id) ON DELETE CASCADE;`);
+    } catch (e) {
+      // Ignored if they already exist or ALTER not supported (older versions)
+    }
   } else if (db) {
     return new Promise((resolve, reject) => {
       db.serialize(() => {
+        db.run(`
+          CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            username TEXT UNIQUE NOT NULL,
+            password TEXT NOT NULL,
+            salt TEXT NOT NULL
+          );
+        `);
+
+        db.run(`
+          CREATE TABLE IF NOT EXISTS sessions (
+            token TEXT PRIMARY KEY,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+          );
+        `);
+
         db.run(`
           CREATE TABLE IF NOT EXISTS deliveries (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,19 +154,25 @@ async function initDb() {
             rider TEXT NOT NULL,
             product TEXT NOT NULL,
             price REAL NOT NULL,
-            fee REAL NOT NULL
+            fee REAL NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
           );
-        `, (err) => { if (err) reject(err); });
+        `);
+
         db.run(`
           CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             date TEXT NOT NULL,
             description TEXT NOT NULL,
-            amount REAL NOT NULL
+            amount REAL NOT NULL,
+            user_id INTEGER REFERENCES users(id) ON DELETE CASCADE
           );
-        `, (err) => {
-          if (err) reject(err);
-          else resolve();
+        `);
+
+        // Migration for SQLite: Add user_id if missing
+        db.run(`ALTER TABLE deliveries ADD COLUMN user_id INTEGER;`, () => {});
+        db.run(`ALTER TABLE expenses ADD COLUMN user_id INTEGER;`, () => {
+          resolve();
         });
       });
     });
@@ -116,5 +183,6 @@ module.exports = {
   query,
   execute,
   initDb,
+  getUserId,
   isPostgres
 };

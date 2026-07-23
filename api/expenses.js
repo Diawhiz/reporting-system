@@ -1,13 +1,12 @@
-const { query, execute, initDb } = require('./db');
+const { query, execute, initDb, getUserId } = require('./db');
 
 module.exports = async (req, res) => {
-  // CORS Headers
   res.setHeader('Access-Control-Allow-Credentials', true);
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version'
+    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization'
   );
 
   if (req.method === 'OPTIONS') {
@@ -16,6 +15,13 @@ module.exports = async (req, res) => {
 
   try {
     await initDb();
+    
+    // Check Authorization
+    const userId = await getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: 'Unauthorized. Please login again.' });
+    }
+
     const { method } = req;
     
     if (method === 'GET') {
@@ -23,7 +29,8 @@ module.exports = async (req, res) => {
       if (!date) {
         return res.status(400).json({ error: 'Date is required' });
       }
-      const rows = await query('SELECT * FROM expenses WHERE date = $1 ORDER BY id ASC', [date]);
+      // Scope query to current user
+      const rows = await query('SELECT * FROM expenses WHERE date = $1 AND user_id = $2 ORDER BY id ASC', [date, userId]);
       const formatted = rows.map(r => ({
         id: r.id,
         date: r.date,
@@ -42,17 +49,17 @@ module.exports = async (req, res) => {
       const numAmt = parseFloat(amt) || 0;
 
       if (id) {
-        // Update existing record
+        // Scope update to current user
         await execute(
-          'UPDATE expenses SET description = $1, amount = $2 WHERE id = $3 AND date = $4',
-          [desc, numAmt, id, date]
+          'UPDATE expenses SET description = $1, amount = $2 WHERE id = $3 AND date = $4 AND user_id = $5',
+          [desc, numAmt, id, date, userId]
         );
         return res.status(200).json({ message: 'Expense updated successfully' });
       } else {
-        // Create new record
+        // Save with current user's ID
         await execute(
-          'INSERT INTO expenses (date, description, amount) VALUES ($1, $2, $3)',
-          [date, desc, numAmt]
+          'INSERT INTO expenses (date, description, amount, user_id) VALUES ($1, $2, $3, $4)',
+          [date, desc, numAmt, userId]
         );
         return res.status(201).json({ message: 'Expense added successfully' });
       }
@@ -63,7 +70,8 @@ module.exports = async (req, res) => {
       if (!id) {
         return res.status(400).json({ error: 'ID is required' });
       }
-      await execute('DELETE FROM expenses WHERE id = $1', [id]);
+      // Scope delete to current user
+      await execute('DELETE FROM expenses WHERE id = $1 AND user_id = $2', [id, userId]);
       return res.status(200).json({ message: 'Expense deleted successfully' });
     }
     

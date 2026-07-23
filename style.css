@@ -440,3 +440,67 @@ h3 {
         justify-content: flex-end;
     }
 }
+
+/* Authentication Screen UI */
+.auth-layout {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 85vh;
+    width: 100%;
+}
+
+.auth-card {
+    max-width: 400px;
+    width: 100%;
+    text-align: center;
+    padding: 36px;
+    box-shadow: 0 12px 48px rgba(0, 0, 0, 0.4);
+}
+
+.auth-brand {
+    margin-bottom: 24px;
+}
+
+.auth-brand h1 {
+    font-size: 1.8rem;
+    margin-top: 8px;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    text-align: left;
+}
+
+.auth-buttons {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.auth-alert {
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid var(--danger);
+    color: #fca5a5;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    margin-bottom: 16px;
+    text-align: left;
+}
+
+.logout-link {
+    color: var(--danger);
+    text-decoration: none;
+    font-weight: 600;
+    margin-left: 4px;
+    transition: var(--transition);
+}
+
+.logout-link:hover {
+    color: #fca5a5;
+    text-shadow: 0 0 8px rgba(248, 113, 113, 0.4);
+}

@@ -1,17 +1,110 @@
 let deliveries = [];
 let expenses = [];
+let currentUser = null;
 
-// --- INITIALIZATION ---
-window.onload = () => {
+// --- INITIALIZATION & AUTH CHECKS ---
+window.onload = async () => {
     // Set default date to today
     document.getElementById('report-date').valueAsDate = new Date();
     
     // Listen for date changes to load data dynamically
     document.getElementById('report-date').addEventListener('change', loadData);
     
-    // Load initial data
-    loadData();
+    // Check if user is already logged in
+    const token = localStorage.getItem('sessionToken');
+    if (token) {
+        try {
+            const res = await fetch('/api/auth?action=validate', {
+                method: 'GET',
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                currentUser = data.username;
+                showDashboard();
+                return;
+            }
+        } catch (err) {
+            console.error('Session validation failed:', err);
+        }
+    }
+    
+    // If no session, show authentication container
+    showAuth();
 };
+
+function showDashboard() {
+    document.getElementById('auth-container').style.display = 'none';
+    document.getElementById('app-container').style.display = 'block';
+    document.getElementById('user-greeting').innerText = currentUser;
+    loadData();
+}
+
+function showAuth() {
+    document.getElementById('app-container').style.display = 'none';
+    document.getElementById('auth-container').style.display = 'flex';
+    document.getElementById('auth-error').style.display = 'none';
+}
+
+// --- AUTHENTICATION ACTIONS ---
+async function handleAuth(mode) {
+    const usernameInput = document.getElementById('auth-username').value.trim();
+    const passwordInput = document.getElementById('auth-password').value;
+    const errorDiv = document.getElementById('auth-error');
+    
+    if (!usernameInput || !passwordInput) {
+        errorDiv.innerText = "Please fill in all fields.";
+        errorDiv.style.display = 'block';
+        return;
+    }
+
+    errorDiv.style.display = 'none';
+
+    try {
+        const res = await fetch(`/api/auth?action=${mode}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username: usernameInput, password: passwordInput })
+        });
+
+        const data = await res.json();
+        
+        if (res.ok) {
+            if (mode === 'login') {
+                localStorage.setItem('sessionToken', data.token);
+                currentUser = data.username;
+                
+                // Clear login fields
+                document.getElementById('auth-username').value = "";
+                document.getElementById('auth-password').value = "";
+                
+                showDashboard();
+            } else {
+                alert('Registration successful! Please login.');
+                document.getElementById('auth-password').value = "";
+            }
+        } else {
+            errorDiv.innerText = data.error || 'Authentication failed.';
+            errorDiv.style.display = 'block';
+        }
+    } catch (err) {
+        console.error(err);
+        errorDiv.innerText = 'Connection to server failed.';
+        errorDiv.style.display = 'block';
+    }
+}
+
+function logout() {
+    localStorage.removeItem('sessionToken');
+    currentUser = null;
+    deliveries = [];
+    expenses = [];
+    showAuth();
+}
+
+// Ensure globally available for HTML onclicks
+window.handleAuth = handleAuth;
+window.logout = logout;
 
 // --- NAVIGATION ---
 function navigateDay(offset) {
@@ -19,42 +112,48 @@ function navigateDay(offset) {
     if (!dateInput.value) return;
     
     const currentDate = new Date(dateInput.value);
-    // Add offset days
     currentDate.setDate(currentDate.getDate() + offset);
     
-    // Format to YYYY-MM-DD
     const yyyy = currentDate.getFullYear();
     const mm = String(currentDate.getMonth() + 1).padStart(2, '0');
     const dd = String(currentDate.getDate()).padStart(2, '0');
     
     dateInput.value = `${yyyy}-${mm}-${dd}`;
-    
-    // Trigger load
     loadData();
 }
+window.navigateDay = navigateDay;
 
 // --- DATA ACCESS ---
 async function loadData() {
     const dateInput = document.getElementById('report-date').value;
-    if (!dateInput) return;
+    const token = localStorage.getItem('sessionToken');
+    if (!dateInput || !token) return;
 
     try {
         const [deliveriesRes, expensesRes] = await Promise.all([
-            fetch(`/api/deliveries?date=${dateInput}`),
-            fetch(`/api/expenses?date=${dateInput}`)
+            fetch(`/api/deliveries?date=${dateInput}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            }),
+            fetch(`/api/expenses?date=${dateInput}`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            })
         ]);
 
         if (deliveriesRes.ok) {
             deliveries = await deliveriesRes.json();
+        } else if (deliveriesRes.status === 401) {
+            return logout();
         }
+
         if (expensesRes.ok) {
             expenses = await expensesRes.json();
+        } else if (expensesRes.status === 401) {
+            return logout();
         }
 
         renderAll();
     } catch (err) {
         console.error('Error loading data:', err);
-        alert('Could not connect to the server or database. Ensure the server is running.');
     }
 }
 
@@ -67,12 +166,14 @@ async function addOrUpdateDelivery() {
     const price = parseFloat(document.getElementById('product-price').value) || 0;
     const fee = parseFloat(document.getElementById('delivery-fee').value) || 0;
     const editIndex = document.getElementById('edit-delivery-index').value;
+    const token = localStorage.getItem('sessionToken');
 
     if (!date || !location || !rider || !product) {
         return alert("Please fill Date, Location, Rider, and Product");
     }
 
-    // Determine if we are updating an existing entry
+    if (!token) return logout();
+
     let id = null;
     if (editIndex !== "") {
         const item = deliveries[editIndex];
@@ -84,7 +185,10 @@ async function addOrUpdateDelivery() {
     try {
         const res = await fetch('/api/deliveries', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(payload)
         });
 
@@ -99,7 +203,6 @@ async function addOrUpdateDelivery() {
         }
     } catch (err) {
         console.error('Error saving delivery:', err);
-        alert('Failed to connect to server.');
     }
 }
 
@@ -108,10 +211,13 @@ async function addOrUpdateExpense() {
     const desc = document.getElementById('expense-desc').value.trim();
     const amt = parseFloat(document.getElementById('expense-amt').value) || 0;
     const editIndex = document.getElementById('edit-expense-index').value;
+    const token = localStorage.getItem('sessionToken');
 
     if (!date || !desc || amt <= 0) {
         return alert("Enter expense details and a valid date");
     }
+
+    if (!token) return logout();
 
     let id = null;
     if (editIndex !== "") {
@@ -124,7 +230,10 @@ async function addOrUpdateExpense() {
     try {
         const res = await fetch('/api/expenses', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
             body: JSON.stringify(payload)
         });
 
@@ -139,19 +248,21 @@ async function addOrUpdateExpense() {
         }
     } catch (err) {
         console.error('Error saving expense:', err);
-        alert('Failed to connect to server.');
     }
 }
 
 async function deleteDelivery(i) {
     const item = deliveries[i];
+    const token = localStorage.getItem('sessionToken');
     if (!item || !item.id) return;
+    if (!token) return logout();
 
     if (!confirm("Are you sure you want to delete this delivery?")) return;
 
     try {
         const res = await fetch(`/api/deliveries?id=${item.id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (res.ok) {
@@ -166,13 +277,16 @@ async function deleteDelivery(i) {
 
 async function deleteExpense(i) {
     const item = expenses[i];
+    const token = localStorage.getItem('sessionToken');
     if (!item || !item.id) return;
+    if (!token) return logout();
 
     if (!confirm("Are you sure you want to delete this expense?")) return;
 
     try {
         const res = await fetch(`/api/expenses?id=${item.id}`, {
-            method: 'DELETE'
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${token}` }
         });
 
         if (res.ok) {
@@ -288,9 +402,6 @@ function editDelivery(index) {
     document.getElementById('delivery-btn').innerText = "Update Detail";
     window.scrollTo(0,0);
 }
-
-// Ensure the helper is globally available for HTML onclick handlers
-window.navigateDay = navigateDay;
 
 function editExpense(index) {
     const e = expenses[index];
