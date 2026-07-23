@@ -16,6 +16,11 @@ if (connectionString) {
     }
   });
 } else {
+  // If on Vercel, do not attempt to fall back to SQLite, fail clearly
+  if (process.env.VERCEL || process.env.NOW_REGION) {
+    throw new Error("DATABASE_URL environment variable is missing on Vercel. Please add it to your environment variables in Vercel settings.");
+  }
+
   // Local fallback to SQLite
   isPostgres = false;
   try {
