@@ -67,7 +67,13 @@ async function handleAuth(mode) {
             body: JSON.stringify({ username: usernameInput, password: passwordInput })
         });
 
-        const data = await res.json();
+        let data = {};
+        const contentType = res.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+            data = await res.json();
+        } else {
+            throw new Error(`Server returned status ${res.status}`);
+        }
         
         if (res.ok) {
             if (mode === 'login') {
