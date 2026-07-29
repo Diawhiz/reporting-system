@@ -1,23 +1,23 @@
 :root {
-    --bg-gradient: linear-gradient(135deg, #0f172a 0%, #1e1b4b 100%);
-    --card-bg: rgba(30, 41, 59, 0.7);
-    --card-border: rgba(255, 255, 255, 0.08);
+    --bg-gradient: linear-gradient(135deg, #180918 0%, #301026 100%);
+    --card-bg: rgba(48, 16, 38, 0.4);
+    --card-border: rgba(255, 143, 203, 0.15);
     
-    --accent: #22d3ee;        /* Neon Teal */
-    --accent-glow: rgba(34, 211, 238, 0.15);
+    --accent: #ff8c42;        /* Vibrant Orange/Gold */
+    --accent-glow: rgba(255, 140, 66, 0.25);
     
-    --primary: #818cf8;       /* Indigo */
-    --primary-gradient: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+    --primary: #c94082;       /* Rich Magenta */
+    --primary-gradient: linear-gradient(135deg, #df4a93 0%, #a82766 100%);
     
-    --success: #34d399;       /* Emerald */
-    --danger: #f87171;        /* Rose/Red */
-    --danger-glow: rgba(248, 113, 113, 0.15);
+    --success: #22c55e;       /* Success remains green but adjusted slightly */
+    --danger: #ef4444;        /* Danger red */
+    --danger-glow: rgba(239, 68, 68, 0.2);
     
-    --text: #f1f5f9;
-    --text-muted: #94a3b8;
-    --input-bg: #0b0f19;
+    --text: #fdf2f8;
+    --text-muted: #fbcfe8;
+    --input-bg: rgba(24, 9, 24, 0.8);
     
-    --transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 * { 

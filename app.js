@@ -2,6 +2,21 @@ let deliveries = [];
 let expenses = [];
 let currentUser = null;
 
+const apiCache = {
+    deliveries: {},
+    expenses: {}
+};
+
+function clearCache(date) {
+    if (date) {
+        delete apiCache.deliveries[date];
+        delete apiCache.expenses[date];
+    } else {
+        apiCache.deliveries = {};
+        apiCache.expenses = {};
+    }
+}
+
 // --- INITIALIZATION & AUTH CHECKS ---
 window.onload = async () => {
     // Set default date to today
@@ -105,6 +120,7 @@ function logout() {
     currentUser = null;
     deliveries = [];
     expenses = [];
+    clearCache();
     showAuth();
 }
 
@@ -135,6 +151,13 @@ async function loadData() {
     const token = localStorage.getItem('sessionToken');
     if (!dateInput || !token) return;
 
+    if (apiCache.deliveries[dateInput] && apiCache.expenses[dateInput]) {
+        deliveries = apiCache.deliveries[dateInput];
+        expenses = apiCache.expenses[dateInput];
+        renderAll();
+        return;
+    }
+
     try {
         const [deliveriesRes, expensesRes] = await Promise.all([
             fetch(`/api/deliveries?date=${dateInput}`, {
@@ -147,12 +170,14 @@ async function loadData() {
 
         if (deliveriesRes.ok) {
             deliveries = await deliveriesRes.json();
+            apiCache.deliveries[dateInput] = deliveries;
         } else if (deliveriesRes.status === 401) {
             return logout();
         }
 
         if (expensesRes.ok) {
             expenses = await expensesRes.json();
+            apiCache.expenses[dateInput] = expenses;
         } else if (expensesRes.status === 401) {
             return logout();
         }
@@ -188,6 +213,17 @@ async function addOrUpdateDelivery() {
 
     const payload = { id, date, location, rider, product, price, fee };
 
+    // Optimistic Update
+    if (editIndex !== "") {
+        deliveries[editIndex] = { ...deliveries[editIndex], ...payload };
+    } else {
+        deliveries.push({ ...payload, id: 'temp-' + Date.now() });
+    }
+    document.getElementById('edit-delivery-index').value = "";
+    document.getElementById('delivery-btn').innerText = "Add Delivery";
+    clearInputs(['delivery-location', 'product-name', 'product-price', 'delivery-fee']);
+    renderAll();
+
     try {
         const res = await fetch('/api/deliveries', {
             method: 'POST',
@@ -199,9 +235,7 @@ async function addOrUpdateDelivery() {
         });
 
         if (res.ok) {
-            document.getElementById('edit-delivery-index').value = "";
-            document.getElementById('delivery-btn').innerText = "Add Delivery";
-            clearInputs(['delivery-location', 'product-name', 'product-price', 'delivery-fee']);
+            clearCache(date);
             await loadData();
         } else {
             const errData = await res.json();
@@ -233,6 +267,17 @@ async function addOrUpdateExpense() {
 
     const payload = { id, date, desc, amt };
 
+    // Optimistic Update
+    if (editIndex !== "") {
+        expenses[editIndex] = { ...expenses[editIndex], ...payload };
+    } else {
+        expenses.push({ ...payload, id: 'temp-' + Date.now() });
+    }
+    document.getElementById('edit-expense-index').value = "";
+    document.getElementById('expense-btn').innerText = "Add Expense";
+    clearInputs(['expense-desc', 'expense-amt']);
+    renderAll();
+
     try {
         const res = await fetch('/api/expenses', {
             method: 'POST',
@@ -244,9 +289,7 @@ async function addOrUpdateExpense() {
         });
 
         if (res.ok) {
-            document.getElementById('edit-expense-index').value = "";
-            document.getElementById('expense-btn').innerText = "Add Expense";
-            clearInputs(['expense-desc', 'expense-amt']);
+            clearCache(date);
             await loadData();
         } else {
             const errData = await res.json();
@@ -272,6 +315,7 @@ async function deleteDelivery(i) {
         });
 
         if (res.ok) {
+            clearCache(item.date);
             await loadData();
         } else {
             alert('Failed to delete delivery');
@@ -296,6 +340,7 @@ async function deleteExpense(i) {
         });
 
         if (res.ok) {
+            clearCache(item.date);
             await loadData();
         } else {
             alert('Failed to delete expense');
