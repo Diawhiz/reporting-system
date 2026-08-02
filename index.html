@@ -46,9 +46,8 @@
 <div class="app-layout" id="app-container" style="display: none;">
     <header class="app-header">
         <div class="brand">
-            <span class="logo-icon">🚚</span>
             <div>
-                <h1>Sage Logistics</h1>
+                <h1>Reporting & Inventory System</h1>
                 <p class="subtitle">Welcome, <strong id="user-greeting" style="color: var(--accent);">User</strong> | <a href="#" onclick="logout()" class="logout-link">Logout</a></p>
             </div>
         </div>
@@ -56,96 +55,202 @@
         <!-- Date Navigation Controls -->
         <div class="date-navigator">
             <button class="btn-nav" id="prev-day-btn" onclick="navigateDay(-1)" title="Previous Day">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+                Prev
             </button>
             <div class="date-input-wrapper">
                 <input type="date" id="report-date">
             </div>
             <button class="btn-nav" id="next-day-btn" onclick="navigateDay(1)" title="Next Day">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg>
+                Next
             </button>
+            <button class="btn btn-secondary" style="padding: 6px 12px; width: auto;" onclick="toggleTheme()">Theme</button>
         </div>
     </header>
 
-    <main class="dashboard-grid">
-        <!-- Input Columns -->
-        <section class="forms-column">
-            <!-- Add/Edit Delivery Card -->
-            <div class="card glass">
-                <div class="card-header">
-                    <h2>Add Delivery</h2>
-                    <span class="badge badge-accent">Orders</span>
-                </div>
-                <div class="form-grid">
-                    <input type="hidden" id="edit-delivery-index" value="">
-                    
-                    <div class="input-group">
-                        <label for="delivery-location">Location</label>
-                        <input type="text" id="delivery-location" placeholder="e.g. Ikirun">
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="rider-name">Rider</label>
-                        <input type="text" id="rider-name" placeholder="e.g. Israel">
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="product-name">Product</label>
-                        <input type="text" id="product-name" placeholder="Product name">
-                    </div>
-                    
-                    <div class="input-group">
-                        <label for="product-price">Price (₦)</label>
-                        <input type="number" id="product-price" placeholder="0">
-                    </div>
-                    
-                    <div class="input-group full-width">
-                        <label for="delivery-fee">Delivery Fee (₦)</label>
-                        <input type="number" id="delivery-fee" placeholder="0">
-                    </div>
-                </div>
-                <button class="btn btn-primary" id="delivery-btn" onclick="addOrUpdateDelivery()">Add Delivery</button>
-            </div>
+    <main class="dashboard-main">
+        <!-- Tabs Navigation -->
+        <div class="tabs-nav">
+            <button class="tab-btn active" onclick="switchTab('tab-daily', this)">Daily Operations</button>
+            <button class="tab-btn" onclick="switchTab('tab-inventory', this)">Inventory</button>
+            <button class="tab-btn" onclick="switchTab('tab-report', this)">Summary & Report</button>
+        </div>
 
-            <!-- Add/Edit Expense Card -->
-            <div class="card glass">
-                <div class="card-header">
-                    <h2>Add Expense</h2>
-                    <span class="badge badge-danger">Cost</span>
-                </div>
-                <div class="form-grid">
-                    <input type="hidden" id="edit-expense-index" value="">
-                    
-                    <div class="input-group">
-                        <label for="expense-desc">Description</label>
-                        <input type="text" id="expense-desc" placeholder="Expense description">
+        <!-- Tab 1: Daily Operations -->
+        <section id="tab-daily" class="tab-content active-tab">
+            <div class="dashboard-grid">
+                <!-- Input Columns -->
+                <div class="forms-column">
+                    <!-- Add/Edit Delivery Card -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h2>Add Delivery</h2>
+                            <span class="badge badge-accent">Orders</span>
+                        </div>
+                        <div class="form-grid">
+                            <input type="hidden" id="edit-delivery-index" value="">
+                            
+                            <div class="input-group">
+                                <label for="delivery-location">Location</label>
+                                <input type="text" id="delivery-location" placeholder="e.g. Ikirun">
+                            </div>
+                            
+                            <div class="input-group full-width">
+                                <label for="rider-name">Rider</label>
+                                <input type="text" id="rider-name" placeholder="e.g. Israel">
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="delivery-vendor">Vendor</label>
+                                <input type="text" placeholder="Search Vendor..." oninput="filterSelect('delivery-vendor', this.value)" style="margin-bottom: 5px; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--surface-border); background: var(--input-bg); color: var(--text); outline:none;">
+                                <select id="delivery-vendor" class="styled-select"><option value="">-- Select Vendor --</option></select>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="delivery-item">Inventory Item</label>
+                                <input type="text" placeholder="Search Item..." oninput="filterSelect('delivery-item', this.value)" style="margin-bottom: 5px; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--surface-border); background: var(--input-bg); color: var(--text); outline:none;">
+                                <select id="delivery-item" class="styled-select" onchange="onDeliveryItemChange()"><option value="">-- Select Item --</option></select>
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="delivery-quantity">Item Quantity</label>
+                                <input type="number" id="delivery-quantity" placeholder="0">
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="product-name">Product / Details</label>
+                                <input type="text" id="product-name" placeholder="Product name">
+                            </div>
+                            
+                            <div class="input-group">
+                                <label for="product-price">Price (₦)</label>
+                                <input type="number" id="product-price" placeholder="0">
+                            </div>
+                            
+                            <div class="input-group full-width">
+                                <label for="delivery-fee">Delivery Fee (₦)</label>
+                                <input type="number" id="delivery-fee" placeholder="0">
+                            </div>
+                        </div>
+                        <button class="btn btn-primary" id="delivery-btn" onclick="addOrUpdateDelivery()">Add Delivery</button>
                     </div>
-                    
-                    <div class="input-group">
-                        <label for="expense-amt">Amount (₦)</label>
-                        <input type="number" id="expense-amt" placeholder="0">
+
+                    <!-- Add/Edit Expense Card -->
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h2>Add Expense</h2>
+                            <span class="badge badge-danger">Cost</span>
+                        </div>
+                        <div class="form-grid">
+                            <input type="hidden" id="edit-expense-index" value="">
+                            
+                            <div class="input-group full-width">
+                                <label for="expense-desc">Description</label>
+                                <input type="text" id="expense-desc" placeholder="Expense description">
+                            </div>
+                            
+                            <div class="input-group full-width">
+                                <label for="expense-amt">Amount (₦)</label>
+                                <input type="number" id="expense-amt" placeholder="0">
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary" id="expense-btn" onclick="addOrUpdateExpense()">Add Expense</button>
                     </div>
                 </div>
-                <button class="btn btn-secondary" id="expense-btn" onclick="addOrUpdateExpense()">Add Expense</button>
+
+                <!-- Preview Columns -->
+                <div class="preview-column">
+                    <!-- Delivered Orders View -->
+                    <div class="card data-card glass">
+                        <div id="delivery-list"></div>
+                    </div>
+
+                    <!-- Expenses View -->
+                    <div class="card data-card glass">
+                        <div id="expense-list"></div>
+                    </div>
+                </div>
             </div>
         </section>
 
-        <!-- Preview & Report Lists -->
-        <section class="preview-column">
-            <!-- Delivered Orders View -->
-            <div class="card data-card">
-                <div id="delivery-list"></div>
-            </div>
+        <!-- Tab 2: Inventory -->
+        <section id="tab-inventory" class="tab-content" style="display: none;">
+            <div class="dashboard-grid">
+                <!-- Manage Inventory Form -->
+                <div class="forms-column">
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h2>Inventory Management</h2>
+                            <span class="badge badge-primary">Admin</span>
+                        </div>
+                        
+                        <div class="inventory-section">
+                            <h4>Items</h4>
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <input type="text" id="new-item-name" placeholder="New Item Name">
+                                </div>
+                                <div class="input-group" style="display:flex; flex-direction:row; gap:5px;">
+                                    <input type="number" id="new-item-price" placeholder="Price (₦)" style="flex:1;">
+                                    <button class="btn btn-primary" style="width:auto; padding: 0 16px;" onclick="addInventoryItem()">Add</button>
+                                </div>
+                            </div>
+                            <div id="manage-items-list" style="margin-top:10px; max-height:150px; overflow-y:auto; font-size:0.85rem;"></div>
+                        </div>
+                        
+                        <div class="inventory-section">
+                            <h4>Vendors</h4>
+                            <div class="form-grid">
+                                <div class="input-group full-width" style="display:flex; flex-direction:row; gap:5px;">
+                                    <input type="text" id="new-vendor-name" placeholder="New Vendor Name" style="flex:1;">
+                                    <button class="btn btn-primary" style="width:auto; padding: 0 16px;" onclick="addVendor()">Add</button>
+                                </div>
+                            </div>
+                            <div id="manage-vendors-list" style="margin-top:10px; max-height:150px; overflow-y:auto; font-size:0.85rem;"></div>
+                        </div>
+                        
+                        <div class="inventory-section" style="border-bottom: none; margin-bottom: 0;">
+                            <h4>Quick Assign Stock</h4>
+                            <div class="form-grid">
+                                <div class="input-group">
+                                    <input type="text" placeholder="Search Vendor..." oninput="filterSelect('assign-vendor', this.value)" style="margin-bottom: 5px; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--surface-border); background: var(--input-bg); color: var(--text); outline:none;">
+                                    <select id="assign-vendor" class="styled-select"><option value="">-- Vendor --</option></select>
+                                </div>
+                                <div class="input-group">
+                                    <input type="text" placeholder="Search Item..." oninput="filterSelect('assign-item', this.value)" style="margin-bottom: 5px; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--surface-border); background: var(--input-bg); color: var(--text); outline:none;">
+                                    <select id="assign-item" class="styled-select"><option value="">-- Item --</option></select>
+                                </div>
+                                <div class="input-group full-width" style="display:flex; flex-direction:row; gap:5px; align-items: flex-end;">
+                                    <input type="number" id="assign-qty" placeholder="Quantity" style="flex:1;">
+                                    <button class="btn btn-primary" style="width:auto; padding: 0 24px; height: 43px;" onclick="assignStock()">Assign</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
-            <!-- Expenses View -->
-            <div class="card data-card">
-                <div id="expense-list"></div>
+                <!-- Balances Preview -->
+                <div class="preview-column">
+                    <div class="card glass">
+                        <div class="card-header">
+                            <h2>Vendor Stock Balances</h2>
+                            <div style="display:flex; gap: 8px;">
+                                <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem; width:auto;" onclick="copyAllInventory()">Copy All</button>
+                                <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem; width:auto;" onclick="loadVendorStocks()">Refresh</button>
+                            </div>
+                        </div>
+                        <div id="vendor-stock-list" class="stock-list-container">
+                            <p style="color:var(--text-muted); text-align:center;">Loading balances...</p>
+                        </div>
+                    </div>
+                </div>
             </div>
+        </section>
 
-            <!-- Summary & Actions -->
-            <div class="card summary-card glass">
+        <!-- Tab 3: Report & Summary -->
+        <section id="tab-report" class="tab-content" style="display: none;">
+            <div class="card summary-card glass" style="max-width: 600px; margin: 0 auto;">
                 <div id="reconciliation-summary"></div>
-                <button class="btn btn-copy" onclick="copyFullReport()">
+                <button class="btn btn-copy" onclick="copyFullReport()" style="margin-top: 20px;">
                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
                     Copy Full Report
                 </button>
@@ -155,5 +260,19 @@
 </div>
 
 <script src="app.js"></script>
+<script>
+    // Tab switching logic
+    function switchTab(tabId, btnElement) {
+        document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+        document.getElementById(tabId).style.display = 'block';
+        
+        document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+        btnElement.classList.add('active');
+
+        if (tabId === 'tab-inventory') {
+            loadVendorStocks();
+        }
+    }
+</script>
 </body>
 </html>

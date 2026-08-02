@@ -1,5 +1,8 @@
 let deliveries = [];
 let expenses = [];
+let inventoryVendors = [];
+let inventoryItems = [];
+let inventoryStocks = [];
 let currentUser = null;
 
 const apiCache = {
@@ -53,6 +56,7 @@ function showDashboard() {
     document.getElementById('app-container').style.display = 'block';
     document.getElementById('user-greeting').innerText = currentUser;
     loadData();
+    loadInventoryData();
 }
 
 function showAuth() {
@@ -196,6 +200,9 @@ async function addOrUpdateDelivery() {
     const product = document.getElementById('product-name').value.trim();
     const price = parseFloat(document.getElementById('product-price').value) || 0;
     const fee = parseFloat(document.getElementById('delivery-fee').value) || 0;
+    const vendor_id = document.getElementById('delivery-vendor').value || null;
+    const item_id = document.getElementById('delivery-item').value || null;
+    const quantity = parseFloat(document.getElementById('delivery-quantity').value) || 0;
     const editIndex = document.getElementById('edit-delivery-index').value;
     const token = localStorage.getItem('sessionToken');
 
@@ -211,7 +218,7 @@ async function addOrUpdateDelivery() {
         if (item) id = item.id;
     }
 
-    const payload = { id, date, location, rider, product, price, fee };
+    const payload = { id, date, location, rider, product, price, fee, vendor_id, item_id, quantity };
 
     // Optimistic Update
     if (editIndex !== "") {
@@ -221,7 +228,9 @@ async function addOrUpdateDelivery() {
     }
     document.getElementById('edit-delivery-index').value = "";
     document.getElementById('delivery-btn').innerText = "Add Delivery";
-    clearInputs(['delivery-location', 'product-name', 'product-price', 'delivery-fee']);
+    clearInputs(['delivery-location', 'product-name', 'product-price', 'delivery-fee', 'delivery-quantity']);
+    document.getElementById('delivery-vendor').value = "";
+    document.getElementById('delivery-item').value = "";
     renderAll();
 
     try {
@@ -449,6 +458,11 @@ function editDelivery(index) {
     document.getElementById('product-name').value = d.product;
     document.getElementById('product-price').value = d.price;
     document.getElementById('delivery-fee').value = d.fee;
+    
+    document.getElementById('delivery-vendor').value = d.vendor_id || "";
+    document.getElementById('delivery-item').value = d.item_id || "";
+    
+    document.getElementById('delivery-quantity').value = d.quantity || "";
     document.getElementById('edit-delivery-index').value = index;
     document.getElementById('delivery-btn').innerText = "Update Detail";
     window.scrollTo(0,0);
@@ -510,3 +524,449 @@ function copyFullReport() {
 
     navigator.clipboard.writeText(text).then(() => alert("Report Copied!"));
 }
+
+// --- INVENTORY MANAGEMENT ---
+async function loadInventoryData() {
+    const token = localStorage.getItem('sessionToken');
+    if (!token) return;
+    try {
+        const [vendorsRes, itemsRes] = await Promise.all([
+            fetch('/api/inventory?action=vendors', { headers: { 'Authorization': `Bearer ${token}` } }),
+            fetch('/api/inventory?action=items', { headers: { 'Authorization': `Bearer ${token}` } })
+        ]);
+        if (vendorsRes.ok) inventoryVendors = await vendorsRes.json();
+        if (itemsRes.ok) inventoryItems = await itemsRes.json();
+        populateInventoryDropdowns();
+    } catch (e) {
+        console.error("Failed to load inventory:", e);
+    }
+}
+
+function populateInventoryDropdowns() {
+    let vendorHtml = '<option value="">-- Select Vendor --</option>';
+    inventoryVendors.forEach(v => vendorHtml += `<option value="${v.id}">${v.name}</option>`);
+    document.getElementById('delivery-vendor').innerHTML = vendorHtml;
+    document.getElementById('assign-vendor').innerHTML = vendorHtml;
+
+    let itemHtml = '<option value="">-- Select Item --</option>';
+    inventoryItems.forEach(i => itemHtml += `<option value="${i.id}">${i.name}</option>`);
+    document.getElementById('delivery-item').innerHTML = itemHtml;
+    document.getElementById('assign-item').innerHTML = itemHtml;
+
+    renderManageLists();
+}
+
+function filterSelect(selectId, filterText) {
+    const select = document.getElementById(selectId);
+    if(!select) return;
+    const isVendor = selectId.includes('vendor');
+    const sourceArray = isVendor ? inventoryVendors : inventoryItems;
+    
+    // Clear and rebuild options
+    select.innerHTML = `<option value="">-- Select ${isVendor ? 'Vendor' : 'Item'} --</option>`;
+    
+    const text = filterText.toLowerCase();
+    sourceArray.forEach(item => {
+        if (item.name.toLowerCase().includes(text)) {
+            select.innerHTML += `<option value="${item.id}">${item.name}</option>`;
+        }
+    });
+}
+
+function renderManageLists() {
+    let vendorHtml = '';
+    inventoryVendors.forEach(v => {
+        vendorHtml += `<div class="stock-item-row" style="padding: 8px 0;"><span>${v.name}</span><button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem; width:auto;" onclick="deleteVendor('${v.id}')">Delete</button></div>`;
+    });
+    document.getElementById('manage-vendors-list').innerHTML = vendorHtml;
+
+    let itemHtml = '';
+    inventoryItems.forEach(i => {
+        const safeName = encodeURIComponent(i.name || '');
+        itemHtml += `<div class="stock-item-row" style="padding: 8px 0;">
+            <div class="stock-details">
+                <strong class="stock-name">${i.name}</strong>
+                <span class="stock-meta">Price: ₦${(parseFloat(i.price) || 0).toLocaleString()}</span>
+            </div>
+            <div class="stock-actions">
+                <button class="btn btn-secondary" style="padding:4px 8px; font-size:0.75rem; width:auto;" onclick="editItem('${i.id}', '${safeName}', ${parseFloat(i.price) || 0})">Edit</button>
+                <button class="btn btn-danger" style="padding:4px 8px; font-size:0.75rem; width:auto;" onclick="deleteItem('${i.id}')">Delete</button>
+            </div>
+        </div>`;
+    });
+    document.getElementById('manage-items-list').innerHTML = itemHtml;
+}
+
+async function addVendor() {
+    const name = document.getElementById('new-vendor-name').value.trim();
+    if(!name) return alert("Vendor name required");
+    
+    // Optimistic Update
+    const tempId = 'temp-' + Date.now();
+    inventoryVendors.push({ id: tempId, name: name });
+    populateInventoryDropdowns();
+    document.getElementById('new-vendor-name').value = "";
+    
+    const token = localStorage.getItem('sessionToken');
+    try {
+        const res = await fetch('/api/inventory?action=vendors', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ name })
+        });
+        if(res.ok) {
+            loadInventoryData(); // sync
+        } else {
+            alert("Failed to add vendor");
+            loadInventoryData();
+        }
+    } catch(e) {
+        loadInventoryData();
+    }
+}
+
+async function addInventoryItem() {
+    const name = document.getElementById('new-item-name').value.trim();
+    const price = parseFloat(document.getElementById('new-item-price').value) || 0;
+    if(!name) return alert("Item name required");
+    
+    // Optimistic Update
+    inventoryItems.push({ id: 'temp-' + Date.now(), name, price, general_stock_balance: 0 });
+    populateInventoryDropdowns();
+    document.getElementById('new-item-name').value = "";
+    document.getElementById('new-item-price').value = "";
+    
+    const token = localStorage.getItem('sessionToken');
+    try {
+        const res = await fetch('/api/inventory?action=items', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ name, price, general_stock_balance: 0 })
+        });
+        if(res.ok) {
+            loadInventoryData(); // sync
+        } else {
+            alert("Failed to add item");
+            loadInventoryData();
+        }
+    } catch(e) {
+        loadInventoryData();
+    }
+}
+
+async function assignStock() {
+    const vendor_id = document.getElementById('assign-vendor').value;
+    const item_id = document.getElementById('assign-item').value;
+    const quantity = parseFloat(document.getElementById('assign-qty').value) || 0;
+    
+    if(!vendor_id || !item_id || !quantity) return alert("Fill all fields correctly");
+    
+    const v = inventoryVendors.find(x => x.id == vendor_id);
+    const i = inventoryItems.find(x => x.id == item_id);
+    
+    // Optimistic Update
+    const existingStock = inventoryStocks.find(s => s.vendor_id == vendor_id && s.item_id == item_id);
+    if (existingStock) {
+        existingStock.quantity = parseFloat(existingStock.quantity) + quantity;
+    } else {
+        inventoryStocks.push({
+            id: 'temp-' + Date.now(),
+            vendor_id, item_id, quantity,
+            vendor_name: v ? v.name : 'Unknown Vendor',
+            item_name: i ? i.name : 'Unknown Item',
+            item_price: i ? i.price : 0
+        });
+    }
+    renderVendorStocks();
+    
+    document.getElementById('assign-qty').value = "";
+    document.getElementById('assign-vendor').value = "";
+    document.getElementById('assign-item').value = "";
+    
+    const token = localStorage.getItem('sessionToken');
+    try {
+        const res = await fetch('/api/inventory?action=assign', {
+            method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ vendor_id, item_id, quantity })
+        });
+        if(res.ok) {
+            loadVendorStocks();
+        } else {
+            alert("Failed to assign stock");
+            loadVendorStocks();
+        }
+    } catch(e) {
+        loadVendorStocks();
+    }
+}
+
+async function deleteVendor(id) {
+    if(!confirm("Delete vendor? This will also remove their stock balances.")) return;
+    
+    // Optimistic Update
+    inventoryVendors = inventoryVendors.filter(v => v.id != id);
+    inventoryStocks = inventoryStocks.filter(s => s.vendor_id != id);
+    populateInventoryDropdowns();
+    renderVendorStocks();
+    
+    const token = localStorage.getItem('sessionToken');
+    try {
+        await fetch(`/api/inventory?action=vendors&id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        loadInventoryData();
+        loadVendorStocks();
+    } catch(e) {
+        loadInventoryData();
+        loadVendorStocks();
+    }
+}
+
+async function deleteItem(id) {
+    if(!confirm("Delete item? This removes it everywhere.")) return;
+    
+    // Optimistic Update
+    inventoryItems = inventoryItems.filter(i => i.id != id);
+    inventoryStocks = inventoryStocks.filter(s => s.item_id != id);
+    populateInventoryDropdowns();
+    renderVendorStocks();
+    
+    const token = localStorage.getItem('sessionToken');
+    try {
+        await fetch(`/api/inventory?action=items&id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        loadInventoryData();
+        loadVendorStocks();
+    } catch(e) {
+        loadInventoryData();
+        loadVendorStocks();
+    }
+}
+
+async function editItem(id, encodedName, currentPrice) {
+    const name = decodeURIComponent(encodedName);
+    const newPrice = prompt(`Update price for ${name} (₦):`, currentPrice);
+    if (newPrice === null) return;
+    
+    // Optimistic Update
+    const itemIndex = inventoryItems.findIndex(i => i.id == id);
+    if (itemIndex > -1) {
+        inventoryItems[itemIndex].price = parseFloat(newPrice) || 0;
+        renderManageLists();
+        populateInventoryDropdowns();
+    }
+    
+    const token = localStorage.getItem('sessionToken');
+    try {
+        const res = await fetch('/api/inventory?action=items', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ id: id, price: parseFloat(newPrice) || 0, general_stock_balance: 0 })
+        });
+        if (!res.ok) {
+            alert("Failed to update item");
+            loadInventoryData();
+        }
+    } catch(e) {
+        loadInventoryData();
+    }
+}
+
+async function deleteStock(id) {
+    if(!confirm("Delete this stock assignment?")) return;
+    
+    // Optimistic Update
+    inventoryStocks = inventoryStocks.filter(s => s.id != id);
+    renderVendorStocks();
+    
+    const token = localStorage.getItem('sessionToken');
+    try {
+        await fetch(`/api/inventory?action=vendor-stocks&id=${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+        loadVendorStocks();
+    } catch(e) {
+        loadVendorStocks();
+    }
+}
+
+async function editStock(id, currentQty, encodedItemName) {
+    const itemName = decodeURIComponent(encodedItemName);
+    const newQty = prompt(`Update stock quantity for ${itemName}:`, currentQty);
+    if (newQty === null) return; // cancelled
+    if (isNaN(newQty) || newQty === "") return alert("Invalid quantity");
+    
+    // Optimistic Update
+    const stockIndex = inventoryStocks.findIndex(s => s.id == id);
+    if (stockIndex > -1) {
+        inventoryStocks[stockIndex].quantity = parseFloat(newQty);
+        renderVendorStocks();
+    }
+    
+    const token = localStorage.getItem('sessionToken');
+    try {
+        const res = await fetch('/api/inventory?action=vendor-stocks', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+            body: JSON.stringify({ id: id, quantity: parseFloat(newQty) })
+        });
+        if (res.ok) {
+            loadVendorStocks();
+        } else {
+            alert("Failed to update stock");
+            loadVendorStocks();
+        }
+    } catch(e) {
+        loadVendorStocks();
+    }
+}
+
+async function loadVendorStocks() {
+    const token = localStorage.getItem('sessionToken');
+    try {
+        const res = await fetch('/api/inventory?action=vendor-stocks', { headers: { 'Authorization': `Bearer ${token}` } });
+        if (res.ok) {
+            inventoryStocks = await res.json();
+            renderVendorStocks();
+        }
+    } catch(e) {
+        console.error("Failed to load vendor stocks");
+    }
+}
+
+function renderVendorStocks() {
+    const container = document.getElementById('vendor-stock-list');
+    if (inventoryStocks.length === 0) {
+        container.innerHTML = "<p style='color:var(--text-muted); text-align:center; padding: 20px 0;'>No stock balances found.</p>";
+        return;
+    }
+    
+    const grouped = {};
+    inventoryStocks.forEach(row => {
+        if(!grouped[row.vendor_name]) grouped[row.vendor_name] = [];
+        grouped[row.vendor_name].push(row);
+    });
+
+    let html = "";
+    let grandTotalValue = 0;
+    
+    for (const [vName, stocks] of Object.entries(grouped)) {
+        let vendorTotal = 0;
+        
+        let rowsHtml = "";
+        stocks.forEach(row => {
+            const lineTotal = (parseFloat(row.quantity) || 0) * (parseFloat(row.item_price) || 0);
+            vendorTotal += lineTotal;
+            grandTotalValue += lineTotal;
+            const safeItemName = encodeURIComponent(row.item_name || '');
+            rowsHtml += `<div class="stock-item-row">
+                <div class="stock-details">
+                    <span class="stock-name">${row.item_name}</span>
+                    <span class="stock-meta">
+                        Stock: <strong>${row.quantity}</strong> 
+                        | Value: <strong>₦${lineTotal.toLocaleString()}</strong> 
+                        (@ ₦${(parseFloat(row.item_price) || 0).toLocaleString()})
+                    </span>
+                </div>
+                <div class="stock-actions">
+                    <button class="btn btn-secondary" style="padding:6px 12px; font-size:0.8rem; width:auto;" onclick="editStock('${row.id}', ${row.quantity}, '${safeItemName}')">Edit</button>
+                    <button class="btn btn-danger" style="padding:6px 12px; font-size:0.8rem; width:auto;" onclick="deleteStock('${row.id}')">Delete</button>
+                </div>
+            </div>`;
+        });
+        
+        html += `<div class="vendor-card">
+            <div class="vendor-card-header">
+                <div>
+                    <div class="vendor-name">${vName}</div>
+                    <div class="vendor-total">Total Value: <span class="vendor-total-val">₦${vendorTotal.toLocaleString()}</span></div>
+                </div>
+                <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem; width:auto;" onclick="copyVendorInventory('${vName}')">Copy</button>
+            </div>`;
+        html += rowsHtml;
+        html += `</div>`;
+    }
+    
+    // Append Grand Total
+    html += `<div class="grand-total-box">
+        <div class="grand-total-label">Grand Total Value</div>
+        <div class="grand-total-value">₦${grandTotalValue.toLocaleString()}</div>
+    </div>`;
+    
+    container.innerHTML = html;
+}
+
+function copyAllInventory() {
+    let text = "=== ALL INVENTORY BALANCES ===\n\n";
+    let hasData = false;
+    document.querySelectorAll('#vendor-stock-list > div').forEach(div => {
+        const vendorName = div.querySelector('strong')?.innerText;
+        if(vendorName) {
+            hasData = true;
+            text += `${vendorName.toUpperCase()}\n`;
+            div.querySelectorAll('div > span').forEach(span => {
+                text += `- ${span.innerText}\n`;
+            });
+            text += "\n";
+        }
+    });
+    if(!hasData) return alert("No inventory to copy.");
+    navigator.clipboard.writeText(text).then(() => alert("All Inventory Copied!"));
+}
+
+function copyVendorInventory(vendorName) {
+    let text = `=== INVENTORY FOR ${vendorName.toUpperCase()} ===\n\n`;
+    document.querySelectorAll('#vendor-stock-list .vendor-card').forEach(div => {
+        const vName = div.querySelector('.vendor-name')?.innerText;
+        if(vName === vendorName) {
+            div.querySelectorAll('.stock-item-row .stock-name').forEach((span, idx) => {
+                const qtyStr = div.querySelectorAll('.stock-item-row .stock-meta strong')[idx * 2]?.innerText || '0';
+                text += `- ${span.innerText}: ${qtyStr}\n`;
+            });
+        }
+    });
+    navigator.clipboard.writeText(text).then(() => alert(`Inventory for ${vendorName} Copied!`));
+}
+
+function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute("data-theme");
+    const newTheme = currentTheme === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", newTheme);
+    localStorage.setItem("theme", newTheme);
+}
+
+function onDeliveryItemChange() {
+    const itemSelect = document.getElementById('delivery-item');
+    const itemId = itemSelect.value;
+    if (itemId) {
+        const selectedItem = inventoryItems.find(i => i.id == itemId);
+        if (selectedItem) {
+            document.getElementById('product-name').value = selectedItem.name;
+            document.getElementById('product-price').value = selectedItem.price || 0;
+            
+            // Also hide the product-name input visually to make it cleaner for inventory items
+            document.getElementById('product-name').parentElement.style.display = 'none';
+        }
+    } else {
+        // Show it again if no item is selected
+        document.getElementById('product-name').parentElement.style.display = 'flex';
+        document.getElementById('product-name').value = '';
+        document.getElementById('product-price').value = '';
+    }
+}
+
+// On load set theme
+document.addEventListener('DOMContentLoaded', () => {
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+});
+
+// Make functions globally available
+window.addVendor = addVendor;
+window.addInventoryItem = addInventoryItem;
+window.assignStock = assignStock;
+window.loadVendorStocks = loadVendorStocks;
+window.deleteVendor = deleteVendor;
+window.deleteItem = deleteItem;
+window.editItem = editItem;
+window.deleteStock = deleteStock;
+window.editStock = editStock;
+window.copyAllInventory = copyAllInventory;
+window.copyVendorInventory = copyVendorInventory;
+window.filterSelect = filterSelect;
+window.toggleTheme = toggleTheme;
+window.onDeliveryItemChange = onDeliveryItemChange;
+

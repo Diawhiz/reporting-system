@@ -10,6 +10,7 @@ app.use(express.json());
 const deliveriesHandler = require('./api/deliveries');
 const expensesHandler = require('./api/expenses');
 const authHandler = require('./api/auth');
+const inventoryHandler = require('./api/inventory');
 
 // Serve static frontend files
 app.use(express.static(path.join(__dirname)));
@@ -31,6 +32,7 @@ const adapter = (handler) => {
 app.all('/api/deliveries', adapter(deliveriesHandler));
 app.all('/api/expenses', adapter(expensesHandler));
 app.all('/api/auth', adapter(authHandler));
+app.all('/api/inventory', adapter(inventoryHandler));
 
 app.listen(PORT, () => {
   console.log(`Local development server running at http://localhost:${PORT}`);
