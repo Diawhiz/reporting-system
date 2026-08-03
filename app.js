@@ -653,13 +653,29 @@ async function loadInventoryData() {
 function populateInventoryDropdowns() {
     let vendorHtml = '<option value="">-- Select Vendor --</option>';
     inventoryVendors.forEach(v => vendorHtml += `<option value="${v.id}">${v.name}</option>`);
-    document.getElementById('delivery-vendor').innerHTML = vendorHtml;
-    document.getElementById('assign-vendor').innerHTML = vendorHtml;
+    
+    const deliveryVendorEl = document.getElementById('delivery-vendor');
+    if (deliveryVendorEl) deliveryVendorEl.innerHTML = vendorHtml;
+    
+    const assignVendorEl = document.getElementById('assign-vendor');
+    if (assignVendorEl) assignVendorEl.innerHTML = vendorHtml;
 
     let itemHtml = '<option value="">-- Select Item --</option>';
     inventoryItems.forEach(i => itemHtml += `<option value="${i.id}">${i.name}</option>`);
-    document.getElementById('delivery-item').innerHTML = itemHtml;
-    document.getElementById('assign-item').innerHTML = itemHtml;
+    
+    const deliveryItemEl = document.getElementById('delivery-item');
+    if (deliveryItemEl) deliveryItemEl.innerHTML = itemHtml;
+    
+    const assignItemEl = document.getElementById('assign-item');
+    if (assignItemEl) assignItemEl.innerHTML = itemHtml;
+
+    // Repopulate dynamic delivery item rows
+    document.querySelectorAll('.delivery-item-row').forEach(row => {
+        const vendorVal = row.querySelector('.row-vendor').value;
+        const itemVal = row.querySelector('.row-item').value;
+        populateRowVendors(row.id, vendorVal);
+        populateRowItems(row.id, itemVal);
+    });
 
     renderManageLists();
 }
