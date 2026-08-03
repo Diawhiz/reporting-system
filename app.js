@@ -1,3 +1,102 @@
+// --- Custom Popup UI ---
+function createPopupOverlay() {
+    let overlay = document.getElementById('custom-popup-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'custom-popup-overlay';
+        overlay.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center;
+            z-index: 10000; opacity: 0; transition: opacity 0.3s ease; pointer-events: none;
+        `;
+        document.body.appendChild(overlay);
+    }
+    return overlay;
+}
+
+window.customAlert = function(msg) {
+    return new Promise(resolve => {
+        const overlay = createPopupOverlay();
+        overlay.innerHTML = `
+            <div style="background: var(--surface-bg, #fff); color: var(--text-main, #333); padding: 24px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-width: 400px; width: 90%; text-align: center; transform: translateY(-20px); transition: transform 0.3s ease;">
+                <p style="margin: 0 0 20px 0; font-size: 1.1rem;">${msg}</p>
+                <button id="custom-alert-btn" style="background: var(--primary-color, #4361ee); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500;">OK</button>
+            </div>
+        `;
+        overlay.style.pointerEvents = 'auto';
+        overlay.style.opacity = '1';
+        const box = overlay.firstElementChild;
+        setTimeout(() => box.style.transform = 'translateY(0)', 10);
+        
+        document.getElementById('custom-alert-btn').onclick = () => {
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+            setTimeout(() => { overlay.innerHTML = ''; resolve(); }, 300);
+        };
+    });
+}
+
+window.customConfirm = function(msg) {
+    return new Promise(resolve => {
+        const overlay = createPopupOverlay();
+        overlay.innerHTML = `
+            <div style="background: var(--surface-bg, #fff); color: var(--text-main, #333); padding: 24px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-width: 400px; width: 90%; text-align: center; transform: translateY(-20px); transition: transform 0.3s ease;">
+                <p style="margin: 0 0 20px 0; font-size: 1.1rem;">${msg}</p>
+                <div style="display: flex; justify-content: center; gap: 12px;">
+                    <button id="custom-confirm-cancel" style="background: var(--surface-border, #ddd); color: var(--text-main, #333); border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500;">Cancel</button>
+                    <button id="custom-confirm-ok" style="background: var(--danger-color, #ef233c); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500;">Confirm</button>
+                </div>
+            </div>
+        `;
+        overlay.style.pointerEvents = 'auto';
+        overlay.style.opacity = '1';
+        const box = overlay.firstElementChild;
+        setTimeout(() => box.style.transform = 'translateY(0)', 10);
+        
+        const close = (val) => {
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+            setTimeout(() => { overlay.innerHTML = ''; resolve(val); }, 300);
+        };
+        document.getElementById('custom-confirm-cancel').onclick = () => close(false);
+        document.getElementById('custom-confirm-ok').onclick = () => close(true);
+    });
+}
+
+window.customPrompt = function(msg, defaultVal = '') {
+    return new Promise(resolve => {
+        const overlay = createPopupOverlay();
+        overlay.innerHTML = `
+            <div style="background: var(--surface-bg, #fff); color: var(--text-main, #333); padding: 24px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); max-width: 400px; width: 90%; text-align: center; transform: translateY(-20px); transition: transform 0.3s ease;">
+                <p style="margin: 0 0 15px 0; font-size: 1.1rem; text-align: left;">${msg}</p>
+                <input type="text" id="custom-prompt-input" value="${defaultVal}" style="width: 100%; padding: 10px; border: 1px solid var(--surface-border, #ccc); border-radius: 6px; margin-bottom: 20px; background: var(--bg-color, #fff); color: var(--text-main, #333); outline: none;">
+                <div style="display: flex; justify-content: flex-end; gap: 12px;">
+                    <button id="custom-prompt-cancel" style="background: var(--surface-border, #ddd); color: var(--text-main, #333); border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500;">Cancel</button>
+                    <button id="custom-prompt-ok" style="background: var(--primary-color, #4361ee); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-weight: 500;">OK</button>
+                </div>
+            </div>
+        `;
+        overlay.style.pointerEvents = 'auto';
+        overlay.style.opacity = '1';
+        const box = overlay.firstElementChild;
+        setTimeout(() => box.style.transform = 'translateY(0)', 10);
+        
+        const input = document.getElementById('custom-prompt-input');
+        input.focus();
+        
+        const close = (val) => {
+            overlay.style.opacity = '0';
+            overlay.style.pointerEvents = 'none';
+            setTimeout(() => { overlay.innerHTML = ''; resolve(val); }, 300);
+        };
+        
+        document.getElementById('custom-prompt-cancel').onclick = () => close(null);
+        document.getElementById('custom-prompt-ok').onclick = () => close(input.value);
+    });
+}
+window.alert = window.customAlert;
+// --- End Custom Popup UI ---
+
 let deliveries = [];
 let expenses = [];
 let inventoryVendors = [];
@@ -105,7 +204,7 @@ async function handleAuth(mode) {
                 
                 showDashboard();
             } else {
-                alert('Registration successful! Please login.');
+                customAlert('Registration successful! Please login.');
                 document.getElementById('auth-password').value = "";
             }
         } else {
@@ -207,7 +306,7 @@ async function addOrUpdateDelivery() {
     const token = localStorage.getItem('sessionToken');
 
     if (!date || !location || !rider || !product) {
-        return alert("Please fill Date, Location, Rider, and Product");
+        return customAlert("Please fill Date, Location, Rider, and Product");
     }
 
     if (!token) return logout();
@@ -248,7 +347,7 @@ async function addOrUpdateDelivery() {
             await loadData();
         } else {
             const errData = await res.json();
-            alert(`Error: ${errData.error || 'Failed to save delivery'}`);
+            customAlert(`Error: ${errData.error || 'Failed to save delivery'}`);
         }
     } catch (err) {
         console.error('Error saving delivery:', err);
@@ -263,7 +362,7 @@ async function addOrUpdateExpense() {
     const token = localStorage.getItem('sessionToken');
 
     if (!date || !desc || amt <= 0) {
-        return alert("Enter expense details and a valid date");
+        return customAlert("Enter expense details and a valid date");
     }
 
     if (!token) return logout();
@@ -302,7 +401,7 @@ async function addOrUpdateExpense() {
             await loadData();
         } else {
             const errData = await res.json();
-            alert(`Error: ${errData.error || 'Failed to save expense'}`);
+            customAlert(`Error: ${errData.error || 'Failed to save expense'}`);
         }
     } catch (err) {
         console.error('Error saving expense:', err);
@@ -315,7 +414,7 @@ async function deleteDelivery(i) {
     if (!item || !item.id) return;
     if (!token) return logout();
 
-    if (!confirm("Are you sure you want to delete this delivery?")) return;
+    if (!await customConfirm("Are you sure you want to delete this delivery?")) return;
 
     try {
         const res = await fetch(`/api/deliveries?id=${item.id}`, {
@@ -327,7 +426,7 @@ async function deleteDelivery(i) {
             clearCache(item.date);
             await loadData();
         } else {
-            alert('Failed to delete delivery');
+            customAlert('Failed to delete delivery');
         }
     } catch (err) {
         console.error('Error deleting delivery:', err);
@@ -340,7 +439,7 @@ async function deleteExpense(i) {
     if (!item || !item.id) return;
     if (!token) return logout();
 
-    if (!confirm("Are you sure you want to delete this expense?")) return;
+    if (!await customConfirm("Are you sure you want to delete this expense?")) return;
 
     try {
         const res = await fetch(`/api/expenses?id=${item.id}`, {
@@ -352,7 +451,7 @@ async function deleteExpense(i) {
             clearCache(item.date);
             await loadData();
         } else {
-            alert('Failed to delete expense');
+            customAlert('Failed to delete expense');
         }
     } catch (err) {
         console.error('Error deleting expense:', err);
@@ -522,7 +621,7 @@ function copyFullReport() {
     text += `Client Funds Collected (${totalSales.toLocaleString()}) - Total Expenses Paid (${totalExp.toLocaleString()}) = Balance: ${(totalSales - totalExp).toLocaleString()}\n\n`;
     text += `= FINAL TRANSFER AMOUNT: ${(totalSales - totalExp).toLocaleString()}`;
 
-    navigator.clipboard.writeText(text).then(() => alert("Report Copied!"));
+    navigator.clipboard.writeText(text).then(() => customAlert("Report Copied!"));
 }
 
 // --- INVENTORY MANAGEMENT ---
@@ -599,7 +698,7 @@ function renderManageLists() {
 
 async function addVendor() {
     const name = document.getElementById('new-vendor-name').value.trim();
-    if(!name) return alert("Vendor name required");
+    if(!name) return customAlert("Vendor name required");
     
     // Optimistic Update
     const tempId = 'temp-' + Date.now();
@@ -616,7 +715,7 @@ async function addVendor() {
         if(res.ok) {
             loadInventoryData(); // sync
         } else {
-            alert("Failed to add vendor");
+            customAlert("Failed to add vendor");
             loadInventoryData();
         }
     } catch(e) {
@@ -627,7 +726,7 @@ async function addVendor() {
 async function addInventoryItem() {
     const name = document.getElementById('new-item-name').value.trim();
     const price = parseFloat(document.getElementById('new-item-price').value) || 0;
-    if(!name) return alert("Item name required");
+    if(!name) return customAlert("Item name required");
     
     // Optimistic Update
     inventoryItems.push({ id: 'temp-' + Date.now(), name, price, general_stock_balance: 0 });
@@ -644,7 +743,7 @@ async function addInventoryItem() {
         if(res.ok) {
             loadInventoryData(); // sync
         } else {
-            alert("Failed to add item");
+            customAlert("Failed to add item");
             loadInventoryData();
         }
     } catch(e) {
@@ -657,7 +756,7 @@ async function assignStock() {
     const item_id = document.getElementById('assign-item').value;
     const quantity = parseFloat(document.getElementById('assign-qty').value) || 0;
     
-    if(!vendor_id || !item_id || !quantity) return alert("Fill all fields correctly");
+    if(!vendor_id || !item_id || !quantity) return customAlert("Fill all fields correctly");
     
     const v = inventoryVendors.find(x => x.id == vendor_id);
     const i = inventoryItems.find(x => x.id == item_id);
@@ -690,7 +789,7 @@ async function assignStock() {
         if(res.ok) {
             loadVendorStocks();
         } else {
-            alert("Failed to assign stock");
+            customAlert("Failed to assign stock");
             loadVendorStocks();
         }
     } catch(e) {
@@ -699,7 +798,7 @@ async function assignStock() {
 }
 
 async function deleteVendor(id) {
-    if(!confirm("Delete vendor? This will also remove their stock balances.")) return;
+    if(!await customConfirm("Delete vendor? This will also remove their stock balances.")) return;
     
     // Optimistic Update
     inventoryVendors = inventoryVendors.filter(v => v.id != id);
@@ -719,7 +818,7 @@ async function deleteVendor(id) {
 }
 
 async function deleteItem(id) {
-    if(!confirm("Delete item? This removes it everywhere.")) return;
+    if(!await customConfirm("Delete item? This removes it everywhere.")) return;
     
     // Optimistic Update
     inventoryItems = inventoryItems.filter(i => i.id != id);
@@ -740,7 +839,7 @@ async function deleteItem(id) {
 
 async function editItem(id, encodedName, currentPrice) {
     const name = decodeURIComponent(encodedName);
-    const newPrice = prompt(`Update price for ${name} (₦):`, currentPrice);
+    const newPrice = await customPrompt(`Update price for ${name} (₦):`, currentPrice);
     if (newPrice === null) return;
     
     // Optimistic Update
@@ -749,6 +848,22 @@ async function editItem(id, encodedName, currentPrice) {
         inventoryItems[itemIndex].price = parseFloat(newPrice) || 0;
         renderManageLists();
         populateInventoryDropdowns();
+        
+        // Update price in vendor stocks immediately
+        inventoryStocks.forEach(stock => {
+            if (stock.item_id == id) {
+                stock.item_price = parseFloat(newPrice) || 0;
+            }
+        });
+        renderVendorStocks();
+
+        // Update delivery form if this item is currently selected
+        const deliverySelect = document.getElementById('delivery-item');
+        if (deliverySelect && deliverySelect.value == id) {
+            if (typeof onDeliveryItemChange === 'function') {
+                onDeliveryItemChange();
+            }
+        }
     }
     
     const token = localStorage.getItem('sessionToken');
@@ -759,16 +874,22 @@ async function editItem(id, encodedName, currentPrice) {
             body: JSON.stringify({ id: id, price: parseFloat(newPrice) || 0, general_stock_balance: 0 })
         });
         if (!res.ok) {
-            alert("Failed to update item");
+            customAlert("Failed to update item");
             loadInventoryData();
+            loadVendorStocks();
+        } else {
+            // Also sync in background
+            loadInventoryData();
+            loadVendorStocks();
         }
     } catch(e) {
         loadInventoryData();
+        loadVendorStocks();
     }
 }
 
 async function deleteStock(id) {
-    if(!confirm("Delete this stock assignment?")) return;
+    if(!await customConfirm("Delete this stock assignment?")) return;
     
     // Optimistic Update
     inventoryStocks = inventoryStocks.filter(s => s.id != id);
@@ -785,9 +906,9 @@ async function deleteStock(id) {
 
 async function editStock(id, currentQty, encodedItemName) {
     const itemName = decodeURIComponent(encodedItemName);
-    const newQty = prompt(`Update stock quantity for ${itemName}:`, currentQty);
+    const newQty = await customPrompt(`Update stock quantity for ${itemName}:`, currentQty);
     if (newQty === null) return; // cancelled
-    if (isNaN(newQty) || newQty === "") return alert("Invalid quantity");
+    if (isNaN(newQty) || newQty === "") return customAlert("Invalid quantity");
     
     // Optimistic Update
     const stockIndex = inventoryStocks.findIndex(s => s.id == id);
@@ -806,7 +927,7 @@ async function editStock(id, currentQty, encodedItemName) {
         if (res.ok) {
             loadVendorStocks();
         } else {
-            alert("Failed to update stock");
+            customAlert("Failed to update stock");
             loadVendorStocks();
         }
     } catch(e) {
@@ -869,15 +990,16 @@ function renderVendorStocks() {
         });
         
         html += `<div class="vendor-card">
-            <div class="vendor-card-header">
+            <div class="vendor-card-header" onclick="toggleVendorCard(this)" style="cursor: pointer;">
                 <div>
-                    <div class="vendor-name">${vName}</div>
+                    <div class="vendor-name">${vName} <span class="vendor-toggle-icon" style="font-size: 0.8em; margin-left: 5px;">▼</span></div>
                     <div class="vendor-total">Total Value: <span class="vendor-total-val">₦${vendorTotal.toLocaleString()}</span></div>
                 </div>
-                <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem; width:auto;" onclick="copyVendorInventory('${vName}')">Copy</button>
+                <button class="btn btn-secondary" style="padding:4px 10px; font-size:0.75rem; width:auto;" onclick="event.stopPropagation(); copyVendorInventory('${vName}')">Copy</button>
             </div>`;
+        html += `<div class="vendor-card-body" style="display: none;">`;
         html += rowsHtml;
-        html += `</div>`;
+        html += `</div></div>`;
     }
     
     // Append Grand Total
@@ -903,8 +1025,29 @@ function copyAllInventory() {
             text += "\n";
         }
     });
-    if(!hasData) return alert("No inventory to copy.");
-    navigator.clipboard.writeText(text).then(() => alert("All Inventory Copied!"));
+    if(!hasData) return customAlert("No inventory to copy.");
+    navigator.clipboard.writeText(text).then(() => customAlert("All Inventory Copied!"));
+}
+
+window.toggleVendorCard = function(headerElement) {
+    const card = headerElement.closest('.vendor-card');
+    const body = card.querySelector('.vendor-card-body');
+    const icon = headerElement.querySelector('.vendor-toggle-icon');
+    const isCurrentlyOpen = body.style.display === 'block';
+
+    // Close all others
+    document.querySelectorAll('#vendor-stock-list .vendor-card').forEach(el => {
+        const otherBody = el.querySelector('.vendor-card-body');
+        const otherIcon = el.querySelector('.vendor-toggle-icon');
+        if (otherBody) otherBody.style.display = 'none';
+        if (otherIcon) otherIcon.innerHTML = '▼';
+    });
+
+    // If it wasn't open, open it
+    if (!isCurrentlyOpen) {
+        body.style.display = 'block';
+        if (icon) icon.innerHTML = '▲';
+    }
 }
 
 function copyVendorInventory(vendorName) {
@@ -918,7 +1061,7 @@ function copyVendorInventory(vendorName) {
             });
         }
     });
-    navigator.clipboard.writeText(text).then(() => alert(`Inventory for ${vendorName} Copied!`));
+    navigator.clipboard.writeText(text).then(() => customAlert(`Inventory for ${vendorName} Copied!`));
 }
 
 function toggleTheme() {
