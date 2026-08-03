@@ -299,9 +299,16 @@ async function addOrUpdateDelivery() {
     const product = document.getElementById('product-name').value.trim();
     const price = parseFloat(document.getElementById('product-price').value) || 0;
     const fee = parseFloat(document.getElementById('delivery-fee').value) || 0;
-    const vendor_id = document.getElementById('delivery-vendor').value || null;
-    const item_id = document.getElementById('delivery-item').value || null;
-    const quantity = parseFloat(document.getElementById('delivery-quantity').value) || 0;
+    const itemsArr = [];
+    document.querySelectorAll('.delivery-item-row').forEach(row => {
+        const vendorId = row.querySelector('.row-vendor').value;
+        const itemId = row.querySelector('.row-item').value;
+        const qty = parseFloat(row.querySelector('.row-qty').value) || 0;
+        if (vendorId && itemId && qty > 0) {
+            itemsArr.push({ vendor_id: vendorId, item_id: itemId, quantity: qty });
+        }
+    });
+    const items_json = itemsArr.length > 0 ? JSON.stringify(itemsArr) : null;
     const editIndex = document.getElementById('edit-delivery-index').value;
     const token = localStorage.getItem('sessionToken');
 
@@ -317,7 +324,7 @@ async function addOrUpdateDelivery() {
         if (item) id = item.id;
     }
 
-    const payload = { id, date, location, rider, product, price, fee, vendor_id, item_id, quantity };
+    const payload = { id, date, location, rider, product, price, fee, items_json };
 
     // Optimistic Update
     if (editIndex !== "") {
@@ -327,9 +334,8 @@ async function addOrUpdateDelivery() {
     }
     document.getElementById('edit-delivery-index').value = "";
     document.getElementById('delivery-btn').innerText = "Add Delivery";
-    clearInputs(['delivery-location', 'product-name', 'product-price', 'delivery-fee', 'delivery-quantity']);
-    document.getElementById('delivery-vendor').value = "";
-    document.getElementById('delivery-item').value = "";
+    clearInputs(['delivery-location', 'product-name', 'product-price', 'delivery-fee']);
+    document.getElementById('delivery-items-container').innerHTML = '';
     renderAll();
 
     try {
@@ -558,10 +564,13 @@ function editDelivery(index) {
     document.getElementById('product-price').value = d.price;
     document.getElementById('delivery-fee').value = d.fee;
     
-    document.getElementById('delivery-vendor').value = d.vendor_id || "";
-    document.getElementById('delivery-item').value = d.item_id || "";
-    
-    document.getElementById('delivery-quantity').value = d.quantity || "";
+    document.getElementById('delivery-items-container').innerHTML = '';
+    const items = d.items_json ? JSON.parse(d.items_json) : [];
+    if (items.length > 0) {
+        items.forEach(item => addDeliveryItemRow(item.vendor_id, item.item_id, item.quantity));
+    } else if (d.vendor_id && d.item_id && d.quantity > 0) {
+        addDeliveryItemRow(d.vendor_id, d.item_id, d.quantity);
+    }
     document.getElementById('edit-delivery-index').value = index;
     document.getElementById('delivery-btn').innerText = "Update Detail";
     window.scrollTo(0,0);
@@ -857,12 +866,9 @@ async function editItem(id, encodedName, currentPrice) {
         });
         renderVendorStocks();
 
-        // Update delivery form if this item is currently selected
-        const deliverySelect = document.getElementById('delivery-item');
-        if (deliverySelect && deliverySelect.value == id) {
-            if (typeof onDeliveryItemChange === 'function') {
-                onDeliveryItemChange();
-            }
+        // Update delivery form if any item was edited
+        if (typeof updateProductNameFromRows === 'function') {
+            updateProductNameFromRows();
         }
     }
     
@@ -1072,22 +1078,8 @@ function toggleTheme() {
 }
 
 function onDeliveryItemChange() {
-    const itemSelect = document.getElementById('delivery-item');
-    const itemId = itemSelect.value;
-    if (itemId) {
-        const selectedItem = inventoryItems.find(i => i.id == itemId);
-        if (selectedItem) {
-            document.getElementById('product-name').value = selectedItem.name;
-            document.getElementById('product-price').value = selectedItem.price || 0;
-            
-            // Also hide the product-name input visually to make it cleaner for inventory items
-            document.getElementById('product-name').parentElement.style.display = 'none';
-        }
-    } else {
-        // Show it again if no item is selected
-        document.getElementById('product-name').parentElement.style.display = 'flex';
-        document.getElementById('product-name').value = '';
-        document.getElementById('product-price').value = '';
+    if (typeof updateProductNameFromRows === 'function') {
+        updateProductNameFromRows();
     }
 }
 
@@ -1113,3 +1105,100 @@ window.filterSelect = filterSelect;
 window.toggleTheme = toggleTheme;
 window.onDeliveryItemChange = onDeliveryItemChange;
 
+
+
+window.addDeliveryItemRow = function(vendorId = '', itemId = '', quantity = '') {
+    const container = document.getElementById('delivery-items-container');
+    const rowId = 'item-row-' + Date.now() + Math.floor(Math.random()*1000);
+    const rowHTML = `
+        <div id="${rowId}" class="delivery-item-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: flex-end; padding-bottom: 10px; border-bottom: 1px dashed var(--surface-border);">
+            <div style="flex: 1;">
+                <label style="font-size: 0.75rem;">Vendor</label>
+                <select class="styled-select row-vendor" onchange="populateRowItems('${rowId}')">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+            <div style="flex: 1;">
+                <label style="font-size: 0.75rem;">Item</label>
+                <select class="styled-select row-item" onchange="updateProductNameFromRows()">
+                    <option value="">-- Select --</option>
+                </select>
+            </div>
+            <div style="width: 80px;">
+                <label style="font-size: 0.75rem;">Qty</label>
+                <input type="number" class="row-qty" value="${quantity}" placeholder="0" style="width: 100%;">
+            </div>
+            <div style="width: auto;">
+                <button type="button" class="btn btn-danger" onclick="document.getElementById('${rowId}').remove(); updateProductNameFromRows();" style="padding: 6px 10px; font-size: 0.8rem; width: auto; margin-bottom: 4px;" title="Remove Item">✕</button>
+            </div>
+        </div>
+    `;
+    container.insertAdjacentHTML('beforeend', rowHTML);
+    populateRowVendors(rowId, vendorId);
+    if (vendorId) {
+        populateRowItems(rowId, itemId);
+    }
+};
+
+window.populateRowVendors = function(rowId, selectedVendorId = '') {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    const vendorSelect = row.querySelector('.row-vendor');
+    vendorSelect.innerHTML = '<option value="">-- Select --</option>';
+    inventoryVendors.forEach(v => {
+        const opt = document.createElement('option');
+        opt.value = v.id;
+        opt.innerText = v.name;
+        if (v.id == selectedVendorId) opt.selected = true;
+        vendorSelect.appendChild(opt);
+    });
+};
+
+window.populateRowItems = function(rowId, selectedItemId = '') {
+    const row = document.getElementById(rowId);
+    if (!row) return;
+    const vendorId = row.querySelector('.row-vendor').value;
+    const itemSelect = row.querySelector('.row-item');
+    itemSelect.innerHTML = '<option value="">-- Select --</option>';
+    
+    if (vendorId) {
+        const availableStocks = inventoryStocks.filter(s => s.vendor_id == vendorId && parseFloat(s.quantity) > 0);
+        availableStocks.forEach(s => {
+            const opt = document.createElement('option');
+            opt.value = s.item_id;
+            opt.innerText = `${s.item_name} (Qty: ${s.quantity})`;
+            if (s.item_id == selectedItemId) opt.selected = true;
+            itemSelect.appendChild(opt);
+        });
+    }
+    updateProductNameFromRows();
+};
+
+window.updateProductNameFromRows = function() {
+    let names = [];
+    let totalPrice = 0;
+    document.querySelectorAll('.delivery-item-row').forEach(row => {
+        const itemSelect = row.querySelector('.row-item');
+        if (itemSelect.selectedIndex > 0) {
+            // Strip the (Qty: X) part
+            const text = itemSelect.options[itemSelect.selectedIndex].text.split(' (Qty:')[0];
+            names.push(text);
+            const itemId = itemSelect.value;
+            const productData = inventoryItems.find(i => i.id == itemId);
+            if(productData) {
+                totalPrice += (parseFloat(productData.price) || 0);
+            }
+        }
+    });
+    
+    if (names.length > 0) {
+        document.getElementById('product-name').value = names.join(', ');
+        // We only automatically set the price if the user hasn't overridden it, or if we want to force it:
+        document.getElementById('product-price').value = totalPrice;
+        document.getElementById('product-name').parentElement.style.display = 'none';
+    } else {
+        document.getElementById('product-name').parentElement.style.display = 'flex';
+        document.getElementById('product-price').value = '';
+        document.getElementById('product-name').value = '';
+    }
+};

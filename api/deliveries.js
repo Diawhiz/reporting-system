@@ -35,7 +35,7 @@ module.exports = async (req, res) => {
     }
     
     if (method === 'POST') {
-      const { id, date, location, rider, product, price, fee, vendor_id, item_id, quantity } = req.body;
+      const { id, date, location, rider, product, price, fee, vendor_id, item_id, quantity, items_json } = req.body;
       if (!date || !location || !rider || !product) {
         return res.status(400).json({ error: 'Missing required fields' });
       }
@@ -46,60 +46,70 @@ module.exports = async (req, res) => {
 
       if (id) {
         // Fetch old delivery to revert stock if necessary
-        const oldDelivery = await query('SELECT vendor_id, item_id, quantity FROM deliveries WHERE id = $1 AND date = $2 AND user_id = $3', [id, date, userId]);
+        const oldDelivery = await query('SELECT vendor_id, item_id, quantity, items_json FROM deliveries WHERE id = $1 AND date = $2 AND user_id = $3', [id, date, userId]);
         if (oldDelivery.length > 0) {
             const old = oldDelivery[0];
+            const oldItems = old.items_json ? JSON.parse(old.items_json) : [];
             if (old.vendor_id && old.item_id && old.quantity > 0) {
-                // Revert old deduction
-                await execute('UPDATE vendor_stocks SET quantity = quantity + $1 WHERE vendor_id = $2 AND item_id = $3', [old.quantity, old.vendor_id, old.item_id]);
-                await execute('INSERT INTO stock_transactions (item_id, vendor_id, quantity_change, type, reference_id, user_id) VALUES ($1, $2, $3, $4, $5, $6)', [old.item_id, old.vendor_id, old.quantity, 'correction', id, userId]);
+                oldItems.push({ vendor_id: old.vendor_id, item_id: old.item_id, quantity: old.quantity });
+            }
+            for (const item of oldItems) {
+                if (item.vendor_id && item.item_id && item.quantity > 0) {
+                    await execute('UPDATE vendor_stocks SET quantity = quantity + $1 WHERE vendor_id = $2 AND item_id = $3', [item.quantity, item.vendor_id, item.item_id]);
+                    await execute('INSERT INTO stock_transactions (item_id, vendor_id, quantity_change, type, reference_id, user_id) VALUES ($1, $2, $3, $4, $5, $6)', [item.item_id, item.vendor_id, item.quantity, 'correction', id, userId]);
+                }
             }
         }
 
         // Apply new deduction if applicable
+        const itemsArr = items_json ? JSON.parse(items_json) : [];
         if (vendor_id && item_id && numQuantity > 0) {
-            const updateRes = await execute('UPDATE vendor_stocks SET quantity = quantity - $1 WHERE vendor_id = $2 AND item_id = $3 AND quantity >= $4', [numQuantity, vendor_id, item_id, numQuantity]);
-            const changes = updateRes.changes !== undefined ? updateRes.changes : updateRes.rowCount;
-            if (changes === 0) {
-                // If the new deduction fails, we should ideally rollback the revert, but for simplicity we return error
-                return res.status(400).json({ error: 'Insufficient stock or invalid vendor/item for new quantity.' });
+            itemsArr.push({ vendor_id, item_id, quantity: numQuantity });
+        }
+        for (const item of itemsArr) {
+            if (item.vendor_id && item.item_id && item.quantity > 0) {
+                const updateRes = await execute('UPDATE vendor_stocks SET quantity = quantity - $1 WHERE vendor_id = $2 AND item_id = $3 AND quantity >= $4', [item.quantity, item.vendor_id, item.item_id, item.quantity]);
+                const changes = updateRes.changes !== undefined ? updateRes.changes : updateRes.rowCount;
+                if (changes === 0) {
+                    return res.status(400).json({ error: 'Insufficient stock or invalid vendor/item for new quantity.' });
+                }
+                await execute('INSERT INTO stock_transactions (item_id, vendor_id, quantity_change, type, reference_id, user_id) VALUES ($1, $2, $3, $4, $5, $6)', [item.item_id, item.vendor_id, -item.quantity, 'deduction', id, userId]);
             }
-            await execute('INSERT INTO stock_transactions (item_id, vendor_id, quantity_change, type, reference_id, user_id) VALUES ($1, $2, $3, $4, $5, $6)', [item_id, vendor_id, -numQuantity, 'deduction', id, userId]);
         }
 
         // Scope update to current user
         await execute(
-          'UPDATE deliveries SET location = $1, rider = $2, product = $3, price = $4, fee = $5, vendor_id = $6, item_id = $7, quantity = $8 WHERE id = $9 AND date = $10 AND user_id = $11',
-          [location, rider, product, numPrice, numFee, vendor_id || null, item_id || null, numQuantity, id, date, userId]
+          'UPDATE deliveries SET location = $1, rider = $2, product = $3, price = $4, fee = $5, vendor_id = NULL, item_id = NULL, quantity = 0, items_json = $6 WHERE id = $7 AND date = $8 AND user_id = $9',
+          [location, rider, product, numPrice, numFee, JSON.stringify(itemsArr), id, date, userId]
         );
         return res.status(200).json({ message: 'Delivery updated successfully' });
       } else {
         // If it's a new delivery with inventory deduction
+        const itemsArr = items_json ? JSON.parse(items_json) : [];
         if (vendor_id && item_id && numQuantity > 0) {
-          // Atomic stock deduction to handle concurrency and insufficient stock
-          const updateRes = await execute(
-            'UPDATE vendor_stocks SET quantity = quantity - $1 WHERE vendor_id = $2 AND item_id = $3 AND quantity >= $4',
-            [numQuantity, vendor_id, item_id, numQuantity]
-          );
-          
-          const changes = updateRes.changes !== undefined ? updateRes.changes : updateRes.rowCount;
-          if (changes === 0) {
-            return res.status(400).json({ error: 'Insufficient stock or invalid vendor/item.' });
-          }
+            itemsArr.push({ vendor_id, item_id, quantity: numQuantity });
+        }
+        for (const item of itemsArr) {
+            if (item.vendor_id && item.item_id && item.quantity > 0) {
+                const updateRes = await execute('UPDATE vendor_stocks SET quantity = quantity - $1 WHERE vendor_id = $2 AND item_id = $3 AND quantity >= $4', [item.quantity, item.vendor_id, item.item_id, item.quantity]);
+                const changes = updateRes.changes !== undefined ? updateRes.changes : updateRes.rowCount;
+                if (changes === 0) {
+                    return res.status(400).json({ error: 'Insufficient stock or invalid vendor/item.' });
+                }
+            }
         }
 
         // Save with current user's ID
         const insertRes = await execute(
-          'INSERT INTO deliveries (date, location, rider, product, price, fee, vendor_id, item_id, quantity, user_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)',
-          [date, location, rider, product, numPrice, numFee, vendor_id || null, item_id || null, numQuantity, userId]
+          'INSERT INTO deliveries (date, location, rider, product, price, fee, vendor_id, item_id, quantity, user_id, items_json) VALUES ($1, $2, $3, $4, $5, $6, NULL, NULL, 0, $7, $8)',
+          [date, location, rider, product, numPrice, numFee, userId, JSON.stringify(itemsArr)]
         );
+        const newDeliveryId = insertRes.lastID || (insertRes.rows && insertRes.rows[0] ? insertRes.rows[0].id : null);
 
-        if (vendor_id && item_id && numQuantity > 0) {
-          const newDeliveryId = insertRes.lastID || (insertRes.rows && insertRes.rows[0] ? insertRes.rows[0].id : null);
-          await execute(
-            'INSERT INTO stock_transactions (item_id, vendor_id, quantity_change, type, reference_id, user_id) VALUES ($1, $2, $3, $4, $5, $6)',
-            [item_id, vendor_id, -numQuantity, 'deduction', newDeliveryId, userId]
-          );
+        for (const item of itemsArr) {
+            if (item.vendor_id && item.item_id && item.quantity > 0) {
+                await execute('INSERT INTO stock_transactions (item_id, vendor_id, quantity_change, type, reference_id, user_id) VALUES ($1, $2, $3, $4, $5, $6)', [item.item_id, item.vendor_id, -item.quantity, 'deduction', newDeliveryId, userId]);
+            }
         }
 
         return res.status(201).json({ message: 'Delivery added successfully' });

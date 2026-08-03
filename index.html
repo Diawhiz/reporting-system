@@ -99,21 +99,10 @@
                                 <input type="text" id="rider-name" placeholder="e.g. Israel">
                             </div>
                             
-                            <div class="input-group">
-                                <label for="delivery-vendor">Vendor</label>
-                                <input type="text" placeholder="Search Vendor..." oninput="filterSelect('delivery-vendor', this.value)" style="margin-bottom: 5px; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--surface-border); background: var(--input-bg); color: var(--text); outline:none;">
-                                <select id="delivery-vendor" class="styled-select"><option value="">-- Select Vendor --</option></select>
-                            </div>
-                            
-                            <div class="input-group">
-                                <label for="delivery-item">Inventory Item</label>
-                                <input type="text" placeholder="Search Item..." oninput="filterSelect('delivery-item', this.value)" style="margin-bottom: 5px; padding: 6px 10px; font-size: 0.85rem; border-radius: 6px; border: 1px solid var(--surface-border); background: var(--input-bg); color: var(--text); outline:none;">
-                                <select id="delivery-item" class="styled-select" onchange="onDeliveryItemChange()"><option value="">-- Select Item --</option></select>
-                            </div>
-                            
-                            <div class="input-group">
-                                <label for="delivery-quantity">Item Quantity</label>
-                                <input type="number" id="delivery-quantity" placeholder="0">
+                            <div class="input-group full-width" style="border: 1px solid var(--surface-border); padding: 10px; border-radius: 6px; margin-bottom: 10px; background: var(--surface-bg);">
+                                <label style="margin-bottom: 10px; display: block; font-weight: 600;">Order Items (Optional)</label>
+                                <div id="delivery-items-container"></div>
+                                <button type="button" class="btn btn-secondary" onclick="addDeliveryItemRow()" style="padding: 6px 12px; font-size: 0.8rem; width: auto; margin-top: 10px;">+ Add Product from Inventory</button>
                             </div>
                             
                             <div class="input-group">

@@ -188,6 +188,7 @@ async function initDb() {
       await database.query(`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS vendor_id INTEGER REFERENCES vendors(id) ON DELETE SET NULL;`);
       await database.query(`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS item_id INTEGER REFERENCES inventory_items(id) ON DELETE SET NULL;`);
       await database.query(`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS quantity NUMERIC(12, 2) DEFAULT 0;`);
+      await database.query(`ALTER TABLE deliveries ADD COLUMN IF NOT EXISTS items_json TEXT;`);
       await database.query(`ALTER TABLE inventory_items ADD COLUMN IF NOT EXISTS price NUMERIC(12, 2) DEFAULT 0;`);
     } catch (e) {
       // Ignore
@@ -237,6 +238,7 @@ async function initDb() {
 
         // Migration for SQLite: Add user_id if missing
         database.run(`ALTER TABLE deliveries ADD COLUMN user_id INTEGER;`, () => {});
+        database.run(`ALTER TABLE deliveries ADD COLUMN items_json TEXT;`, () => {});
         database.run(`ALTER TABLE expenses ADD COLUMN user_id INTEGER;`, () => {
           
           database.run(`
